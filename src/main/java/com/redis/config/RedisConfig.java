@@ -34,12 +34,9 @@ public class RedisConfig {
         try (InputStream is = getClass().getClassLoader().getResourceAsStream("application.properties")) {
             if (is != null) {
                 properties.load(is);
-                System.out.println("[RedisConfig] Loaded application.properties");
-            } else {
-                System.out.println("[RedisConfig] No application.properties found, using defaults");
             }
         } catch (IOException e) {
-            System.err.println("[RedisConfig] Error loading properties: " + e.getMessage());
+            System.err.println("[RedisConfig] Warning: Error loading properties: " + e.getMessage());
         }
     }
 

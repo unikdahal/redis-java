@@ -65,6 +65,20 @@ public class RedisDatabase {
     }
 
     /**
+     * Check if a key exists in the database (not expired).
+     */
+    public boolean exists(String key) {
+        var entry = map.get(key);
+        if (entry == null) return false;
+        // Check if expired
+        if (entry.expiryMillis != Long.MAX_VALUE && entry.expiryMillis <= System.currentTimeMillis()) {
+            map.remove(key, entry);
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Retrieve a key's value. Returns null if key doesn't exist or has expired.
      * Lazy expiry: checks expiry time on access.
      */
@@ -95,7 +109,6 @@ public class RedisDatabase {
      */
     private void removeKey(String key) {
         map.remove(key);
-        System.out.println("[RedisDatabase] Expired key: " + key);
     }
 
     /**

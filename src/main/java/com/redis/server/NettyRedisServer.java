@@ -48,8 +48,7 @@ public class NettyRedisServer {
                         }
                     });
 
-            System.out.println("[NettyRedisServer] Configuration: " + config);
-            System.out.println("[NettyRedisServer] Starting Redis Server on port: " + config.getPort());
+            System.out.println("[Redis] Server starting on port: " + config.getPort());
 
             // Bind and start to accept incoming connections
             ChannelFuture f = b.bind(config.getPort()).sync();
@@ -60,6 +59,7 @@ public class NettyRedisServer {
             workerGroup.shutdownGracefully();
             bossGroup.shutdownGracefully();
             RedisDatabase.getInstance().shutdown();
+            System.out.println("[Redis] Server stopped");
         }
     }
 
