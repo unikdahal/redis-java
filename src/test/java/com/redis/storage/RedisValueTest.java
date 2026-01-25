@@ -13,6 +13,16 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RedisValueTest {
 
+    /**
+     * Helper method to create a RedisValue using reflection for testing validation.
+     * This bypasses the factory methods to directly test the private constructor.
+     */
+    private RedisValue createViaReflection(RedisValue.Type type, Object data) throws Exception {
+        var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
+        constructor.setAccessible(true);
+        return (RedisValue) constructor.newInstance(type, data);
+    }
+
     @Test
     void testStringValue() {
         RedisValue value = RedisValue.string("hello");
@@ -110,42 +120,23 @@ class RedisValueTest {
     @Test
     void testNullDataThrows() {
         // Use reflection to access the private constructor for testing
-        assertThrows(Exception.class, () -> {
-            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
-            constructor.setAccessible(true);
-            constructor.newInstance(RedisValue.Type.STRING, null);
-        });
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.STRING, null));
     }
 
     @Test
     void testMismatchedTypeThrows() {
         // Use reflection to test type validation
-        assertThrows(Exception.class, () -> {
-            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
-            constructor.setAccessible(true);
-            // Try to create a STRING type with a List data
-            constructor.newInstance(RedisValue.Type.STRING, List.of("test"));
-        });
+        
+        // Try to create a STRING type with a List data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.STRING, List.of("test")));
 
-        assertThrows(Exception.class, () -> {
-            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
-            constructor.setAccessible(true);
-            // Try to create a LIST type with a String data
-            constructor.newInstance(RedisValue.Type.LIST, "test");
-        });
+        // Try to create a LIST type with a String data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.LIST, "test"));
 
-        assertThrows(Exception.class, () -> {
-            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
-            constructor.setAccessible(true);
-            // Try to create a SET type with a List data
-            constructor.newInstance(RedisValue.Type.SET, List.of("test"));
-        });
+        // Try to create a SET type with a List data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.SET, List.of("test")));
 
-        assertThrows(Exception.class, () -> {
-            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
-            constructor.setAccessible(true);
-            // Try to create a HASH type with a String data
-            constructor.newInstance(RedisValue.Type.HASH, "test");
-        });
+        // Try to create a HASH type with a String data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.HASH, "test"));
     }
 }
