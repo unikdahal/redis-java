@@ -68,6 +68,7 @@ Or use the provided test script:
 bash src/main/test/test.sh
 ```
 (Requires the server to be running and `netcat` (nc) to be installed)
+(Note: The test script is located in `src/main/test/` which is unconventional but part of the project structure)
 
 ## Project Structure
 
@@ -147,18 +148,20 @@ The server follows a layered architecture:
 
 ### Configuration
 
-Server configuration is in `src/main/java/com/redis/config/RedisConfig.java`:
+Server configuration is in `src/main/java/com/redis/config/RedisConfig.java` with defaults:
 - `redis.port`: Default 6379
 - `redis.boss.threads`: Boss thread pool size (default 1)
 - `redis.worker.threads`: Worker thread pool size (default 1)
+- `redis.cleanup.interval.ms`: Cleanup interval in ms (default 5000)
+- `redis.expiry.enabled`: Enable TTL expiry (default true)
 
-Configuration can be overridden via `src/main/resources/application.properties` (if it exists).
+Configuration can be overridden by creating or modifying `src/main/resources/application.properties`.
 
 ## Common Issues and Workarounds
 
 1. **Java Version Mismatch:** The project requires Java 25 but may fail to build on Java 17 with "invalid target release: 25" error. Solutions:
    - Install and use Java 25 (recommended)
-   - Temporarily modify `pom.xml` to use available Java version (lines 12-13 and 68-69) for development testing
+   - Temporarily modify `pom.xml` to use available Java version: update both the properties section (lines 12-15) and the compiler plugin configuration (lines 68-69) for development testing
    - Note: The `--enable-preview` flag is configured in both compiler and runtime settings
 
 2. **Missing Dependencies:** Always run `mvn clean install` after pulling changes to ensure all dependencies are up to date.
