@@ -106,4 +106,46 @@ class RedisValueTest {
         assertTrue(str.contains("STRING"));
         assertTrue(str.contains("hello"));
     }
+
+    @Test
+    void testNullDataThrows() {
+        // Use reflection to access the private constructor for testing
+        assertThrows(Exception.class, () -> {
+            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
+            constructor.setAccessible(true);
+            constructor.newInstance(RedisValue.Type.STRING, null);
+        });
+    }
+
+    @Test
+    void testMismatchedTypeThrows() {
+        // Use reflection to test type validation
+        assertThrows(Exception.class, () -> {
+            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
+            constructor.setAccessible(true);
+            // Try to create a STRING type with a List data
+            constructor.newInstance(RedisValue.Type.STRING, List.of("test"));
+        });
+
+        assertThrows(Exception.class, () -> {
+            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
+            constructor.setAccessible(true);
+            // Try to create a LIST type with a String data
+            constructor.newInstance(RedisValue.Type.LIST, "test");
+        });
+
+        assertThrows(Exception.class, () -> {
+            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
+            constructor.setAccessible(true);
+            // Try to create a SET type with a List data
+            constructor.newInstance(RedisValue.Type.SET, List.of("test"));
+        });
+
+        assertThrows(Exception.class, () -> {
+            var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
+            constructor.setAccessible(true);
+            // Try to create a HASH type with a String data
+            constructor.newInstance(RedisValue.Type.HASH, "test");
+        });
+    }
 }

@@ -21,7 +21,7 @@ public class GetCommand implements ICommand {
             return ERR_WRONG_ARGS;
         }
 
-        String key = args.getFirst();
+        String key = args.get(0);
         String value = RedisDatabase.getInstance().get(key);
 
         if (value == null) {

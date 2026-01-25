@@ -36,10 +36,66 @@ public final class RedisValue {
      *
      * @param type the stored value's {@link Type}
      * @param data the raw data associated with the type (e.g. `String`, `List<String>`, `Set<String>`, or `Map<String,String>`)
+     * @throws IllegalArgumentException if the data type does not match the expected type for the given Type enum
      */
     private RedisValue(Type type, Object data) {
+        // Validate that data matches the expected type
+        validateDataType(type, data);
         this.type = type;
         this.data = data;
+    }
+
+    /**
+     * Validates that the data object matches the expected type for the given Type enum.
+     *
+     * @param type the Type enum value
+     * @param data the data object to validate
+     * @throws IllegalArgumentException if the data type does not match
+     */
+    private static void validateDataType(Type type, Object data) {
+        if (data == null) {
+            throw new IllegalArgumentException("Data cannot be null");
+        }
+
+        switch (type) {
+            case STRING:
+                if (!(data instanceof String)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a String for Type.STRING, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case LIST:
+                if (!(data instanceof List)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a List for Type.LIST, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case SET:
+                if (!(data instanceof Set)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a Set for Type.SET, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case HASH:
+                if (!(data instanceof Map)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a Map for Type.HASH, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case SORTED_SET:
+                if (!(data instanceof Map)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a Map for Type.SORTED_SET, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown type: " + type);
+        }
     }
 
     /**
