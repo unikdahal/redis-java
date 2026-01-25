@@ -122,13 +122,17 @@ public class RedisDatabase {
      * @param key the key to look up
      * @param expectedType the expected RedisValue.Type to match
      * @param <T> the expected data type returned
-     * @return the stored value cast to the requested type, or {@code null} if the key is missing, expired, or the stored value's type does not match {@code expectedType}
+     * @return the stored value cast to the requested type, or {@code null} if the key is missing or expired
+     * @throws IllegalStateException if the stored value's type does not match {@code expectedType}
      */
     @SuppressWarnings("unchecked")
     public <T> T getTyped(String key, RedisValue.Type expectedType) {
         RedisValue value = getValue(key);
-        if (value == null || value.getType() != expectedType) {
+        if (value == null) {
             return null;
+        }
+        if (value.getType() != expectedType) {
+            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected " + expectedType + ", got " + value.getType());
         }
         return (T) value.getData();
     }

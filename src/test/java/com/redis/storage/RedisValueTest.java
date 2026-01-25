@@ -54,12 +54,23 @@ class RedisValueTest {
     }
 
     @Test
+    void testSortedSetValue() {
+        Map<String, Double> sortedSet = Map.of("member1", 1.0, "member2", 2.5, "member3", 3.0);
+        RedisValue value = RedisValue.sortedSet(sortedSet);
+
+        assertEquals(RedisValue.Type.SORTED_SET, value.getType());
+        assertEquals(sortedSet, value.asSortedSet());
+        assertTrue(value.isType(RedisValue.Type.SORTED_SET));
+    }
+
+    @Test
     void testWrongTypeAccessThrows() {
         RedisValue stringValue = RedisValue.string("test");
 
         assertThrows(IllegalStateException.class, stringValue::asList);
         assertThrows(IllegalStateException.class, stringValue::asSet);
         assertThrows(IllegalStateException.class, stringValue::asHash);
+        assertThrows(IllegalStateException.class, stringValue::asSortedSet);
     }
 
     @Test
@@ -157,5 +168,71 @@ class RedisValueTest {
         assertEquals("value1", value.asHash().get("key1"));
         assertEquals("value2", value.asHash().get("key2"));
         assertNull(value.asHash().get("key3"));
+    }
+
+    @Test
+    void testSortedSetDefensiveCopy() {
+        java.util.HashMap<String, Double> mutableSortedSet = new java.util.HashMap<>();
+        mutableSortedSet.put("member1", 1.0);
+        mutableSortedSet.put("member2", 2.5);
+
+        RedisValue value = RedisValue.sortedSet(mutableSortedSet);
+
+        // Modify the original map
+        mutableSortedSet.put("member3", 3.0);
+
+        // The RedisValue should not be affected
+        assertEquals(2, value.asSortedSet().size());
+        assertEquals(1.0, value.asSortedSet().get("member1"));
+        assertEquals(2.5, value.asSortedSet().get("member2"));
+        assertNull(value.asSortedSet().get("member3"));
+    }
+
+    @Test
+    void testListImmutability() {
+        List<String> list = List.of("a", "b", "c");
+        RedisValue value = RedisValue.list(list);
+        List<String> retrievedList = value.asList();
+
+        // Verify that attempting to modify the list throws UnsupportedOperationException
+        assertThrows(UnsupportedOperationException.class, () -> retrievedList.add("d"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedList.remove(0));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedList.clear());
+    }
+
+    @Test
+    void testSetImmutability() {
+        Set<String> set = Set.of("x", "y", "z");
+        RedisValue value = RedisValue.set(set);
+        Set<String> retrievedSet = value.asSet();
+
+        // Verify that attempting to modify the set throws UnsupportedOperationException
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.add("w"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.remove("x"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.clear());
+    }
+
+    @Test
+    void testHashImmutability() {
+        Map<String, String> hash = Map.of("field1", "value1", "field2", "value2");
+        RedisValue value = RedisValue.hash(hash);
+        Map<String, String> retrievedHash = value.asHash();
+
+        // Verify that attempting to modify the map throws UnsupportedOperationException
+        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.put("field3", "value3"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.remove("field1"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.clear());
+    }
+
+    @Test
+    void testSortedSetImmutability() {
+        Map<String, Double> sortedSet = Map.of("member1", 1.0, "member2", 2.5, "member3", 3.0);
+        RedisValue value = RedisValue.sortedSet(sortedSet);
+        Map<String, Double> retrievedSortedSet = value.asSortedSet();
+
+        // Verify that attempting to modify the sorted set throws UnsupportedOperationException
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSortedSet.put("member4", 4.0));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSortedSet.remove("member1"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSortedSet.clear());
     }
 }
