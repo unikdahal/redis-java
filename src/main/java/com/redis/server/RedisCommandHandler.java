@@ -15,7 +15,6 @@ import java.util.List;
  * Netty channel handler for processing incoming Redis commands.
  * Parses RESP protocol, dispatches to appropriate command handlers,
  * and writes RESP-formatted responses back to the client.
- *
  * Optimizations:
  * - Reuses ArrayList for argument parsing
  * - Fast integer parsing without object allocation
@@ -43,7 +42,7 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
             if (cmd == null) {
                 writeResponse(ctx, "-ERR unknown command '" + commandName + "'\r\n");
             } else {
-                // Create sublist for command args (avoids creating new ArrayList)
+                // Create a sublist for command args (avoids creating a new ArrayList)
                 List<String> commandArgs = args.size() > 1 ? args.subList(1, args.size()) : List.of();
                 String resp = cmd.execute(commandArgs, ctx);
                 writeResponse(ctx, resp);
@@ -57,7 +56,6 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
     /**
      * Parse a RESP array from the ByteBuf.
      * Expected format: *<count>\r\n$<len>\r\n<data>\r\n...\r\n
-     *
      * Optimization: Fast path for common cases, minimal allocations
      */
     private List<String> parseRespArray(ByteBuf buf) {
