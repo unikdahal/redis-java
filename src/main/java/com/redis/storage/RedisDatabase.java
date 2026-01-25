@@ -199,17 +199,16 @@ public class RedisDatabase {
     /**
      * Atomically compute a new value for a key.
      * Thread-safe read-modify-write operation using ConcurrentHashMap.compute().
+     * Preserves TTL for existing non-expired keys.
      *
      * @param key the key to compute
      * @param remappingFunction function that takes existing RedisValue (or null) and returns new value
      */
     public void compute(String key, java.util.function.Function<RedisValue, RedisValue> remappingFunction) {
         map.compute(key, (k, existingEntry) -> {
-            // Get current value, checking expiry
-            RedisValue currentValue = null;
-            if (existingEntry != null && !isExpired(existingEntry)) {
-                currentValue = existingEntry.value;
-            }
+            // Check if entry exists and is not expired
+            boolean validEntry = existingEntry != null && !isExpired(existingEntry);
+            RedisValue currentValue = validEntry ? existingEntry.value : null;
 
             // Apply remapping function
             RedisValue newValue = remappingFunction.apply(currentValue);
@@ -219,10 +218,8 @@ public class RedisDatabase {
                 return null;
             }
 
-            // Preserve expiry if value unchanged, otherwise no expiry for new value
-            long expiry = (existingEntry != null && currentValue == newValue)
-                ? existingEntry.expiryMillis
-                : Long.MAX_VALUE;
+            // Preserve expiry for existing non-expired entries, otherwise no expiry
+            long expiry = validEntry ? existingEntry.expiryMillis : Long.MAX_VALUE;
 
             return new ValueEntry(newValue, expiry);
         });
