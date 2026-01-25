@@ -14,6 +14,17 @@ import java.util.List;
 public class TtlCommand implements ICommand {
     private static final String ERR_WRONG_ARGS = "-ERR wrong number of arguments for 'TTL' command\r\n";
 
+    /**
+     * Returns the remaining time to live for the given key encoded as a Redis RESP integer reply.
+     *
+     * <p>If {@code args} is empty the method returns the wrong-arguments error string.
+     *
+     * @param args list of command arguments; the first element is the key to check
+     * @return a RESP integer reply string:
+     *         {@code -2} if the key does not exist or has just expired,
+     *         {@code -1} if the key exists but has no expiry,
+     *         the TTL in seconds otherwise; or the wrong-arguments error string when {@code args} is empty
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.isEmpty()) return ERR_WRONG_ARGS;
@@ -35,6 +46,11 @@ public class TtlCommand implements ICommand {
         return ":" + ttlSeconds + "\r\n";
     }
 
+    /**
+     * Command name for the TTL command.
+     *
+     * @return the literal command name "TTL"
+     */
     @Override
     public String name() {
         return "TTL";

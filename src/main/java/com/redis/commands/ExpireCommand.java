@@ -15,6 +15,17 @@ public class ExpireCommand implements ICommand {
     private static final String ERR_WRONG_ARGS = "-ERR wrong number of arguments for 'EXPIRE' command\r\n";
     private static final String ERR_VALUE = "-ERR value is not an integer or out of range\r\n";
 
+    /**
+     * Set a seconds-based expiration timestamp for the specified key.
+     *
+     * Expects {@code args} to contain the key at index 0 and the expiry in seconds at index 1.
+     * Returns the command error reply {@code ERR_WRONG_ARGS} if fewer than two arguments are provided,
+     * or {@code ERR_VALUE} if the expiry value is not a valid integer.
+     *
+     * @param args the command arguments: {@code [key, seconds]}
+     * @param ctx   the Netty channel context (not used by this implementation)
+     * @return {@code ":1\r\n"} if the expiry was set, {@code ":0\r\n"} otherwise
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.size() < 2) return ERR_WRONG_ARGS;
@@ -33,6 +44,11 @@ public class ExpireCommand implements ICommand {
         return success ? ":1\r\n" : ":0\r\n";
     }
 
+    /**
+     * Command name handled by this command implementation.
+     *
+     * @return the command name "EXPIRE"
+     */
     @Override
     public String name() {
         return "EXPIRE";

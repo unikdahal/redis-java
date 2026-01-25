@@ -27,7 +27,13 @@ public class BLPopCommand implements ICommand {
     private static final String RESP_NIL = "*-1\r\n";
 
     private static final long POLL_INTERVAL_MS = 50; // Poll every 50ms for better responsiveness
-    private static final long MAX_TIMEOUT_SECONDS = 60 * 60 * 24; // Max 24 hours
+    private static final long MAX_TIMEOUT_SECONDS = 60 * 60 * 24; /**
+     * Performs a blocking left-pop on the specified keys using the provided timeout and returns the popped key and element encoded as a RESP array.
+     *
+     * @param args the command arguments: one or more keys followed by a timeout in seconds (decimal allowed)
+     * @param ctx the Netty channel context for the request
+     * @return a RESP two-element array `[key, element]` when an element is popped; `RESP_NIL` if the timeout expires or no element is available; or an error string (`ERR_WRONG_ARGS` or `ERR_TIMEOUT`) for invalid input
+     */
 
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
@@ -96,6 +102,15 @@ public class BLPopCommand implements ICommand {
         return RESP_NIL;
     }
 
+    /**
+     * Attempt to atomically remove and return the first element of the list stored at the given key,
+     * updating or removing the key in the database as appropriate.
+     *
+     * @param db  the RedisDatabase instance to operate on
+     * @param key the key whose list to pop from
+     * @return the popped element if one was removed, or `null` if the key did not exist, the list was empty,
+     *         or the key held a non-list value (in which case the key is skipped)
+     */
     private String tryPopFromKey(RedisDatabase db, String key) {
         AtomicBoolean wrongType = new AtomicBoolean(false);
         AtomicReference<String> poppedRef = new AtomicReference<>(null);
@@ -137,6 +152,13 @@ public class BLPopCommand implements ICommand {
         return poppedRef.get();
     }
 
+    /**
+     * Builds a Redis RESP two-element array representing [key, element].
+     *
+     * @param key the list key to include as the first element
+     * @param element the popped element to include as the second element
+     * @return the RESP-formatted string for an array containing the key and element
+     */
     private String formatResult(String key, String element) {
         // Return RESP array: *2\r\n$keylen\r\nkey\r\n$elemlen\r\nelement\r\n
         StringBuilder sb = new StringBuilder();
@@ -148,6 +170,11 @@ public class BLPopCommand implements ICommand {
         return sb.toString();
     }
 
+    /**
+     * Provide the BLPOP command identifier.
+     *
+     * @return the command name "BLPOP"
+     */
     @Override
     public String name() {
         return "BLPOP";

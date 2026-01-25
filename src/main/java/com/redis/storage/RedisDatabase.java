@@ -40,6 +40,11 @@ public class RedisDatabase {
         this.expiryManager = new ExpiryManager(this::removeKey);
     }
 
+    /**
+     * Provide the lazily initialized, thread-safe singleton instance of RedisDatabase.
+     *
+     * @return the singleton RedisDatabase instance
+     */
     public static RedisDatabase getInstance() {
         if (INSTANCE == null) {
             synchronized (RedisDatabase.class) {
@@ -52,9 +57,10 @@ public class RedisDatabase {
     }
 
     /**
-     * Get the absolute expiry time in milliseconds for a key.
-     * Returns -1 if key doesn't exist.
-     * Returns Long.MAX_VALUE if key exists but has no expiry.
+     * Retrieve the absolute expiry time (epoch milliseconds) for the given key.
+     *
+     * @param key the key to query
+     * @return -1 if the key does not exist or is expired, Long.MAX_VALUE if the key exists without expiry, otherwise the absolute expiry time in milliseconds
      */
     public long getExpiryTime(String key) {
         var entry = map.get(key);
@@ -67,8 +73,14 @@ public class RedisDatabase {
     }
 
     /**
-     * Set a new expiry time for an existing key.
-     * Returns true if successful, false if key doesn't exist.
+     * Update the absolute expiry time for an existing key.
+     *
+     * If `expiryTimeMillis` is `Long.MAX_VALUE` the key's expiry is cleared (made persistent).
+     * If the key does not exist or is already expired the entry is removed and no update is performed.
+     *
+     * @param key the key whose expiry to update
+     * @param expiryTimeMillis the new absolute expiry time in milliseconds since epoch, or `Long.MAX_VALUE` to remove expiry
+     * @return `true` if an existing non-expired key's expiry was updated, `false` if the key did not exist or was expired
      */
     public boolean setExpiryTime(String key, long expiryTimeMillis) {
         AtomicBoolean updated = new AtomicBoolean(false);
@@ -88,8 +100,13 @@ public class RedisDatabase {
     // ==================== Generic RedisValue Methods ====================
 
     /**
-     * Store a RedisValue without expiry.
-     */
+         * Store a RedisValue under the given key with no expiry.
+         *
+         * Any existing expiry associated with the key is cleared.
+         *
+         * @param key   the key to store the value under
+         * @param value the value to store
+         */
     public void put(String key, RedisValue value) {
         map.put(key, new ValueEntry(value, Long.MAX_VALUE));
         expiryManager.clearExpiry(key);
@@ -188,7 +205,10 @@ public class RedisDatabase {
     }
 
     /**
-     * Remove a key from the database.
+     * Remove the mapping for the given key and cancel any scheduled expiry.
+     *
+     * @param key the key to remove
+     * @return `true` if a mapping was removed, `false` otherwise
      */
     public boolean remove(String key) {
         boolean removed = map.remove(key) != null;
@@ -237,12 +257,15 @@ public class RedisDatabase {
     // ==================== Atomic Operations ====================
 
     /**
-     * Atomically compute a new value for a key.
-     * Thread-safe read-modify-write operation using ConcurrentHashMap.compute().
-     * Preserves TTL for existing non-expired keys.
+     * Compute and install a new value for a key using the provided remapping function, preserving TTL for unexpired entries.
+     *
+     * The remapping function is invoked with the current value for the key, or `null` if the key is absent or expired.
+     * If the function returns `null`, the key is removed. If it returns a non-null value, that value is stored;
+     * an existing unexpired entry's expiry is preserved, otherwise the new entry has no expiry.
+     * The operation is performed atomically.
      *
      * @param key the key to compute
-     * @param remappingFunction function that takes existing RedisValue (or null) and returns new value
+     * @param remappingFunction function that receives the current `RedisValue` (or `null`) and returns the new `RedisValue`, or `null` to remove the key
      */
     public void compute(String key, java.util.function.Function<RedisValue, RedisValue> remappingFunction) {
         map.compute(key, (k, existingEntry) -> {

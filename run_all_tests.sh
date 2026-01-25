@@ -24,7 +24,7 @@ TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
 
-# Function to print section header
+# print_section prints a formatted blue section header with the provided title.
 print_section() {
     echo ""
     echo -e "${BLUE}===============================================${NC}"
@@ -33,7 +33,8 @@ print_section() {
     echo ""
 }
 
-# Function to run test and track results
+# run_test executes a test command, increments TOTAL_TESTS and either PASSED_TESTS or FAILED_TESTS, and prints a formatted pass/fail message.
+# run_test takes two arguments: the test name (a short label) and the command string to run.
 run_test() {
     local test_name=$1
     local test_cmd=$2
