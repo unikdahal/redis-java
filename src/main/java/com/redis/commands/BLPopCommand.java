@@ -66,6 +66,12 @@ public class BLPopCommand implements ICommand {
 
         RedisDatabase db = RedisDatabase.getInstance();
 
+        // WARNING: This implementation uses Thread.sleep() which blocks the Netty I/O thread.
+        // This prevents the server from processing other clients' requests during BLPOP execution.
+        // A production implementation should use Netty's event loop scheduling or a separate
+        // executor thread pool to avoid blocking the I/O thread.
+        // TODO: Refactor to use async/non-blocking approach with event notification.
+        
         // Poll until we find an element or timeout
         while (System.currentTimeMillis() < deadline) {
             // Try each key in order
