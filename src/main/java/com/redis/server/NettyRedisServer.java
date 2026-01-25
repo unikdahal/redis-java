@@ -26,13 +26,13 @@ public class NettyRedisServer {
     public void run() throws Exception {
         /*
          * Boss Group: handles incoming connection requests.
-         * Typically uses 1 thread for simple servers.
+         * Typically, uses 1 thread for simple servers.
          */
         EventLoopGroup bossGroup = new NioEventLoopGroup(config.getBossThreads());
 
         /*
          * Worker Group: handles I/O for accepted connections.
-         * Single-threaded model enforces Redis-like sequential command processing.
+         * A single-threaded model enforces Redis-like sequential command processing.
          * CRITICAL: Set to 1 to ensure single-threaded semantics without explicit locking.
          */
         EventLoopGroup workerGroup = new NioEventLoopGroup(config.getWorkerThreads());
