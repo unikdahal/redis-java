@@ -161,7 +161,7 @@ Configuration can be overridden by creating or modifying `src/main/resources/app
 
 1. **Java Version Mismatch:** The project requires Java 25 but may fail to build on Java 17 with "invalid target release: 25" error. Solutions:
    - Install and use Java 25 (recommended)
-   - Temporarily modify `pom.xml` to use available Java version: update both the properties section (lines 12-15) and the compiler plugin configuration (lines 68-69) for development testing
+   - Temporarily modify `pom.xml` to use available Java version: update the properties section (lines 12-15) and the maven-compiler-plugin configuration (lines 63-74) for development testing
    - Note: The `--enable-preview` flag is configured in both compiler and runtime settings
 
 2. **Missing Dependencies:** Always run `mvn clean install` after pulling changes to ensure all dependencies are up to date.
