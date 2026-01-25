@@ -13,6 +13,7 @@ import java.util.Set;
  * - LIST: Ordered list of strings (supports LPUSH, RPUSH, LRANGE, etc.)
  * - SET: Unordered collection of unique strings (supports SADD, SMEMBERS, etc.)
  * - HASH: Map of field-value pairs (supports HSET, HGET, HGETALL, etc.)
+ * - SORTED_SET: Set with scores for ordering (supports ZADD, ZRANGE, etc.)
  */
 public final class RedisValue {
 
@@ -23,7 +24,8 @@ public final class RedisValue {
         STRING,
         LIST,
         SET,
-        HASH
+        HASH,
+        SORTED_SET
     }
 
     private final Type type;
@@ -33,7 +35,7 @@ public final class RedisValue {
      * Create a RedisValue with the specified type and associated raw data.
      *
      * @param type the stored value's {@link Type}
-     * @param data the raw data associated with the type (e.g. `String`, `List<String>`, `Set<String>`, or `Map<String,String>`)
+     * @param data the raw data associated with the type (e.g. `String`, `List<String>`, `Set<String>`, `Map<String,String>`, or `Map<String,Double>` for sorted sets)
      */
     private RedisValue(Type type, Object data) {
         this.type = type;
@@ -100,6 +102,16 @@ public final class RedisValue {
         return new RedisValue(Type.HASH, value);
     }
 
+    /**
+     * Create a RedisValue representing a Redis sorted set.
+     *
+     * @param value mapping of members to their scores (higher scores = higher rank)
+     * @return a RedisValue of type SORTED_SET containing the provided member-score mapping
+     */
+    public static RedisValue sortedSet(Map<String, Double> value) {
+        return new RedisValue(Type.SORTED_SET, value);
+    }
+
     // ==================== Type-Safe Accessors ====================
 
     /**
@@ -155,6 +167,20 @@ public final class RedisValue {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + type);
         }
         return (Map<String, String>) data;
+    }
+
+    /**
+     * Return the stored value as a Map representing a Redis sorted set.
+     *
+     * @return the underlying data as a Map<String, Double> where keys are members and values are scores
+     * @throws IllegalStateException if the stored type is not {@code SORTED_SET}
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Double> asSortedSet() {
+        if (type != Type.SORTED_SET) {
+            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SORTED_SET, got " + type);
+        }
+        return (Map<String, Double>) data;
     }
 
     /**

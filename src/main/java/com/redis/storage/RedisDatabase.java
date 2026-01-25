@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - LIST: Ordered list of strings
  * - SET: Unordered collection of unique strings
  * - HASH: Map of field-value pairs
+ * - SORTED_SET: Set with scores for ordering
  *
  * Expiry is managed by ExpiryManager (zero-polling approach with DelayQueue).
  */
