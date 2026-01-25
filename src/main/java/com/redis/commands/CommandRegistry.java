@@ -30,6 +30,7 @@ public class CommandRegistry {
         register(new GetCommand());
         register(new DelCommand());
         register(new RPushCommand());
+        register(new LRangeCommand());
     }
 
     /**
