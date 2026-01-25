@@ -6,6 +6,8 @@ import org.junit.jupiter.api.DisplayName;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -219,7 +221,7 @@ public class RedisDatabaseTest {
     @Test
     @DisplayName("getValue: Returns RedisValue for SET type")
     void testGetValueSet() {
-        Set<String> set = new java.util.HashSet<>(Arrays.asList("x", "y", "z"));
+        Set<String> set = new HashSet<>(Arrays.asList("x", "y", "z"));
         db.put("set_key", RedisValue.set(set));
         RedisValue value = db.getValue("set_key");
         
@@ -231,7 +233,7 @@ public class RedisDatabaseTest {
     @Test
     @DisplayName("getValue: Returns RedisValue for HASH type")
     void testGetValueHash() {
-        Map<String, String> hash = new java.util.HashMap<>();
+        Map<String, String> hash = new HashMap<>();
         hash.put("field1", "value1");
         hash.put("field2", "value2");
         db.put("hash_key", RedisValue.hash(hash));
@@ -296,7 +298,7 @@ public class RedisDatabaseTest {
     @Test
     @DisplayName("getTyped: Returns SET data when type matches")
     void testGetTypedSetMatch() {
-        Set<String> set = new java.util.HashSet<>(Arrays.asList("x", "y"));
+        Set<String> set = new HashSet<>(Arrays.asList("x", "y"));
         db.put("typed_set", RedisValue.set(set));
         Set<String> result = db.getTyped("typed_set", RedisValue.Type.SET);
         
@@ -307,7 +309,7 @@ public class RedisDatabaseTest {
     @Test
     @DisplayName("getTyped: Returns HASH data when type matches")
     void testGetTypedHashMatch() {
-        Map<String, String> hash = new java.util.HashMap<>();
+        Map<String, String> hash = new HashMap<>();
         hash.put("k1", "v1");
         db.put("typed_hash", RedisValue.hash(hash));
         Map<String, String> result = db.getTyped("typed_hash", RedisValue.Type.HASH);
@@ -383,7 +385,7 @@ public class RedisDatabaseTest {
     @Test
     @DisplayName("getType: Returns SET type for set values")
     void testGetTypeSet() {
-        db.put("type_set", RedisValue.set(new java.util.HashSet<>(Arrays.asList("x"))));
+        db.put("type_set", RedisValue.set(new HashSet<>(Arrays.asList("x"))));
         RedisValue.Type type = db.getType("type_set");
         
         assertEquals(RedisValue.Type.SET, type);
@@ -392,7 +394,7 @@ public class RedisDatabaseTest {
     @Test
     @DisplayName("getType: Returns HASH type for hash values")
     void testGetTypeHash() {
-        Map<String, String> hash = new java.util.HashMap<>();
+        Map<String, String> hash = new HashMap<>();
         hash.put("field", "value");
         db.put("type_hash", RedisValue.hash(hash));
         RedisValue.Type type = db.getType("type_hash");
