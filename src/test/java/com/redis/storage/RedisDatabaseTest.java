@@ -319,19 +319,44 @@ public class RedisDatabaseTest {
     }
 
     @Test
-    @DisplayName("getTyped: Returns null when type mismatches")
-    void testGetTypedTypeMismatch() {
-        db.put("typed_mismatch", RedisValue.string("value"));
-        List<String> result = db.getTyped("typed_mismatch", RedisValue.Type.LIST);
-        
+    @DisplayName("Database: getTyped returns value for matching type")
+    void testGetTypedMatchingType() {
+        db.put("string_key", RedisValue.string("test_value"));
+        String result = db.getTyped("string_key", RedisValue.Type.STRING);
+        assertEquals("test_value", result);
+    }
+
+    @Test
+    @DisplayName("Database: getTyped returns null for non-existent key")
+    void testGetTypedNonExistent() {
+        String result = db.getTyped("nonexistent", RedisValue.Type.STRING);
         assertNull(result);
     }
 
     @Test
-    @DisplayName("getTyped: Returns null for non-existent key")
-    void testGetTypedNonExistent() {
-        String result = db.getTyped("nonexistent_typed", RedisValue.Type.STRING);
-        assertNull(result);
+    @DisplayName("Database: getTyped throws exception for type mismatch")
+    void testGetTypedThrowsOnTypeMismatch() {
+        db.put("string_key", RedisValue.string("test_value"));
+        
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            db.getTyped("string_key", RedisValue.Type.LIST);
+        });
+        
+        assertTrue(exception.getMessage().contains("WRONGTYPE"));
+        assertTrue(exception.getMessage().contains("Expected LIST"));
+        assertTrue(exception.getMessage().contains("got STRING"));
+    }
+
+    @Test
+    @DisplayName("getTyped: Throws exception when type mismatches")
+    void testGetTypedTypeMismatch() {
+        db.put("typed_mismatch", RedisValue.string("value"));
+        
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            db.getTyped("typed_mismatch", RedisValue.Type.LIST);
+        });
+        
+        assertTrue(exception.getMessage().contains("WRONGTYPE"));
     }
 
     @Test
@@ -357,9 +382,13 @@ public class RedisDatabaseTest {
         assertEquals("text", strResult);
         assertEquals(Arrays.asList("item"), listResult);
         
-        // Type mismatch should return null
-        assertNull(db.getTyped("multi_str", RedisValue.Type.LIST));
-        assertNull(db.getTyped("multi_list", RedisValue.Type.STRING));
+        // Type mismatch should throw exception
+        assertThrows(IllegalStateException.class, () -> {
+            db.getTyped("multi_str", RedisValue.Type.LIST);
+        });
+        assertThrows(IllegalStateException.class, () -> {
+            db.getTyped("multi_list", RedisValue.Type.STRING);
+        });
     }
 
     // ==================== Tests for getType() ====================
