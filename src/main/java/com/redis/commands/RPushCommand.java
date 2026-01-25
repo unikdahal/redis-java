@@ -16,6 +16,12 @@ public class RPushCommand implements ICommand {
     private static final String ERR_WRONG_ARGS = "-ERR wrong number of arguments for 'RPUSH' command\r\n";
     private static final String ERR_WRONG_TYPE = "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n";
 
+    /**
+     * Append the given values to the tail of the list stored at the specified key and report the list's new length.
+     *
+     * @param args a list where the first element is the target key and the subsequent elements are the values to append
+     * @return a Redis RESP integer string of the new list size in the form ":<size>\r\n"; returns ERR_WRONG_ARGS if fewer than two arguments are provided, or ERR_WRONG_TYPE if the key exists and is not a list
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.size() < 2) {
@@ -34,6 +40,14 @@ public class RPushCommand implements ICommand {
         return ":" + newSize + "\r\n";
     }
 
+    /**
+     * Append the provided elements to the tail of the list stored at the given key, creating the list if it does not exist.
+     *
+     * @param db   the RedisDatabase to operate on
+     * @param key  the key for the target list
+     * @param args the command arguments where elements to append start at index 1
+     * @return the size of the list after the append, or -1 if the existing value at the key is not a list
+     */
     @SuppressWarnings("unchecked")
     private int pushElements(RedisDatabase db, String key, List<String> args) {
         RedisValue existing = db.getValue(key);
@@ -62,6 +76,11 @@ public class RPushCommand implements ICommand {
         return list.size();
     }
 
+    /**
+     * Redis command name implemented by this class.
+     *
+     * @return the command name "RPUSH".
+     */
     @Override
     public String name() {
         return "RPUSH";
