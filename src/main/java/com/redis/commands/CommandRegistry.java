@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * This is a singleton initialized with built-in commands.
  *
  * Optimizations:
- * - Minimal logging overhead (removed debug logs from hot path)
  * - Case-insensitive lookups with single toUpperCase() call
  * - ConcurrentHashMap with capacity hints for faster lookup
  */
@@ -20,11 +19,17 @@ public class CommandRegistry {
 
     private final Map<String, ICommand> registry = new ConcurrentHashMap<>(16);
 
+    /**
+     * Initializes the singleton CommandRegistry and registers the built-in commands.
+     *
+     * Registers the default command implementations: SetCommand, GetCommand, DelCommand, and RPushCommand.
+     */
     private CommandRegistry() {
         // Register built-in commands
         register(new SetCommand());
         register(new GetCommand());
         register(new DelCommand());
+        register(new RPushCommand());
     }
 
     /**
