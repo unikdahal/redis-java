@@ -2,6 +2,9 @@ package com.redis.storage;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -111,7 +114,7 @@ class RedisValueTest {
 
     @Test
     void testListImmutability() {
-        List<String> original = new java.util.ArrayList<>(List.of("a", "b", "c"));
+        List<String> original = new ArrayList<>(List.of("a", "b", "c"));
         RedisValue value = RedisValue.list(original);
 
         // Modifying the original list should not affect the RedisValue
@@ -121,11 +124,13 @@ class RedisValueTest {
 
         // The returned list from asList() should be unmodifiable
         assertThrows(UnsupportedOperationException.class, () -> value.asList().add("e"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asList().remove(0));
+        assertThrows(UnsupportedOperationException.class, () -> value.asList().clear());
     }
 
     @Test
     void testSetImmutability() {
-        Set<String> original = new java.util.HashSet<>(Set.of("x", "y", "z"));
+        Set<String> original = new HashSet<>(Set.of("x", "y", "z"));
         RedisValue value = RedisValue.set(original);
 
         // Modifying the original set should not affect the RedisValue
@@ -135,11 +140,13 @@ class RedisValueTest {
 
         // The returned set from asSet() should be unmodifiable
         assertThrows(UnsupportedOperationException.class, () -> value.asSet().add("v"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSet().remove("x"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSet().clear());
     }
 
     @Test
     void testHashImmutability() {
-        Map<String, String> original = new java.util.HashMap<>(Map.of("key1", "val1", "key2", "val2"));
+        Map<String, String> original = new HashMap<>(Map.of("key1", "val1", "key2", "val2"));
         RedisValue value = RedisValue.hash(original);
 
         // Modifying the original map should not affect the RedisValue
@@ -149,6 +156,24 @@ class RedisValueTest {
 
         // The returned map from asHash() should be unmodifiable
         assertThrows(UnsupportedOperationException.class, () -> value.asHash().put("key4", "val4"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asHash().remove("key1"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asHash().clear());
+    }
+
+    @Test
+    void testSortedSetImmutability() {
+        Map<String, Double> original = new HashMap<>(Map.of("member1", 1.0, "member2", 2.0));
+        RedisValue value = RedisValue.sortedSet(original);
+
+        // Modifying the original map should not affect the RedisValue
+        original.put("member3", 3.0);
+        assertEquals(2, value.asSortedSet().size());
+        assertFalse(value.asSortedSet().containsKey("member3"));
+
+        // The returned map from asSortedSet() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asSortedSet().put("member4", 4.0));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSortedSet().remove("member1"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSortedSet().clear());
     }
 
     @Test
