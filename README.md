@@ -12,7 +12,7 @@ A high-performance, lightweight, in-memory Redis-compatible server built from th
 
 - **⚡ High Performance**: Built on Netty's asynchronous event-driven framework for massive concurrency.
 - **💾 In-Memory Storage**: Optimized data structures using `ConcurrentHashMap` for thread-safe, lock-free reads.
-- **🔌 Redis Protocol (RESP)**: Full support for the Redis Serialization Protocol, compatible with any standard Redis client (`redis-cli`, `jedis`, `redis-py`, etc.).
+- **🔌 Redis Protocol (RESP)**: Implements the Redis Serialization Protocol, compatible with any standard Redis client (`redis-cli`, `jedis`, `redis-py`, etc.).
 - **⏳ Advanced Expiration**: Dual-strategy expiration (Lazy + Active background cleanup via `DelayQueue`).
 - **🎯 Single-Threaded Execution**: Mimics Redis's atomic command processing model for data consistency.
 - **🏗️ Extensible Command Registry**: Easy to add new commands via a simple interface.
