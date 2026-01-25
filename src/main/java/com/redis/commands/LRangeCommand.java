@@ -20,7 +20,7 @@ public class LRangeCommand implements ICommand {
             return ERR_WRONG_ARGS;
         }
 
-        String key = args.getFirst();
+        String key = args.get(0);
         int start, stop;
 
         try {

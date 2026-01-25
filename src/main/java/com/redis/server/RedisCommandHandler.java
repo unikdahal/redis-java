@@ -58,7 +58,7 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
             }
 
             // Extract command name and arguments
-            String commandName = argsBuffer.getFirst();
+            String commandName = argsBuffer.get(0);
             ICommand cmd = CommandRegistry.getInstance().get(commandName);
 
             if (cmd == null) {
