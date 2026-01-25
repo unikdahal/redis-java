@@ -106,4 +106,40 @@ class RedisValueTest {
         assertTrue(str.contains("STRING"));
         assertTrue(str.contains("hello"));
     }
+
+    @Test
+    void testListImmutability() {
+        List<String> list = List.of("a", "b", "c");
+        RedisValue value = RedisValue.list(list);
+        List<String> retrievedList = value.asList();
+
+        // Verify that attempting to modify the list throws UnsupportedOperationException
+        assertThrows(UnsupportedOperationException.class, () -> retrievedList.add("d"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedList.remove(0));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedList.clear());
+    }
+
+    @Test
+    void testSetImmutability() {
+        Set<String> set = Set.of("x", "y", "z");
+        RedisValue value = RedisValue.set(set);
+        Set<String> retrievedSet = value.asSet();
+
+        // Verify that attempting to modify the set throws UnsupportedOperationException
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.add("w"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.remove("x"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.clear());
+    }
+
+    @Test
+    void testHashImmutability() {
+        Map<String, String> hash = Map.of("field1", "value1", "field2", "value2");
+        RedisValue value = RedisValue.hash(hash);
+        Map<String, String> retrievedHash = value.asHash();
+
+        // Verify that attempting to modify the map throws UnsupportedOperationException
+        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.put("field3", "value3"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.remove("field1"));
+        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.clear());
+    }
 }
