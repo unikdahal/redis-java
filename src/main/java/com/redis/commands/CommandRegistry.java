@@ -19,6 +19,11 @@ public class CommandRegistry {
 
     private final Map<String, ICommand> registry = new ConcurrentHashMap<>(16);
 
+    /**
+     * Initializes the singleton CommandRegistry and registers the built-in commands.
+     *
+     * Registers the default command implementations: SetCommand, GetCommand, DelCommand, and RPushCommand.
+     */
     private CommandRegistry() {
         // Register built-in commands
         register(new SetCommand());
