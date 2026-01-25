@@ -16,7 +16,8 @@ FAILED=0
 send_cmd() {
     local cmd="$1"
     # Convert command to RESP format
-    local args=($cmd)
+    local args
+    read -ra args <<< "$cmd"
     local num_args=${#args[@]}
     local resp="*${num_args}\r\n"
 
