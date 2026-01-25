@@ -4,7 +4,7 @@ import io.netty.channel.ChannelHandlerContext;
 
 import java.util.List;
 
-public class RPushCommand implements ICommand{
+public class RPushCommand implements ICommand {
 
     /**
      * Append one or more values to the tail of the list stored at the specified key and return the list's new length.
