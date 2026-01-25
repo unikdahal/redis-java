@@ -1,5 +1,6 @@
 package com.redis.storage;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -120,7 +121,7 @@ public final class RedisValue {
     /**
      * Return the underlying value as a {@code List<String>}.
      *
-     * @return the stored {@code List<String>}
+     * @return an unmodifiable view of the stored {@code List<String>}
      * @throws IllegalStateException if the stored type is not {@code Type.LIST}
      */
     @SuppressWarnings("unchecked")
@@ -128,13 +129,13 @@ public final class RedisValue {
         if (type != Type.LIST) {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + type);
         }
-        return (List<String>) data;
+        return Collections.unmodifiableList((List<String>) data);
     }
 
     /**
      * Return the stored value as a set of strings.
      *
-     * @return the stored value as a {@code Set<String>}
+     * @return an unmodifiable view of the stored value as a {@code Set<String>}
      * @throws IllegalStateException if the stored type is not {@code Type.SET}
      */
     @SuppressWarnings("unchecked")
@@ -142,13 +143,13 @@ public final class RedisValue {
         if (type != Type.SET) {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + type);
         }
-        return (Set<String>) data;
+        return Collections.unmodifiableSet((Set<String>) data);
     }
 
     /**
      * Return the stored value as a Map representing a Redis hash.
      *
-     * @return the underlying data as a Map<String, String>
+     * @return an unmodifiable view of the underlying data as a Map<String, String>
      * @throws IllegalStateException if the stored type is not {@code HASH}
      */
     @SuppressWarnings("unchecked")
@@ -156,7 +157,7 @@ public final class RedisValue {
         if (type != Type.HASH) {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + type);
         }
-        return (Map<String, String>) data;
+        return Collections.unmodifiableMap((Map<String, String>) data);
     }
 
     /**
