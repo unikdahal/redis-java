@@ -2,7 +2,7 @@
 # Comprehensive integration tests for Redis Java server.
 # Uses redis-cli style inline commands via netcat.
 
-set -euo pipefail
+set -uo pipefail
 
 HOST=localhost
 PORT=6379

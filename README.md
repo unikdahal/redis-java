@@ -14,7 +14,7 @@ A high-performance, lightweight, in-memory Redis-compatible server built from th
 - **💾 In-Memory Storage**: Optimized data structures using `ConcurrentHashMap` for thread-safe, lock-free reads.
 - **🔌 Redis Protocol (RESP)**: Implements the Redis Serialization Protocol, compatible with any standard Redis client (`redis-cli`, `jedis`, `redis-py`, etc.).
 - **⏳ Advanced Expiration**: Dual-strategy expiration (Lazy + Active background cleanup via `DelayQueue`).
-- **🎯 Single-Threaded Execution**: Mimics Redis's atomic command processing model for data consistency.
+- **🎯 Single-Threaded Execution**: Primarily single-threaded command execution for predictable behavior; note that some blocking commands (e.g., `BLPOP`) currently block the I/O thread and do **not** yet match Redis's non-blocking event-driven handling.
 - **🏗️ Extensible Command Registry**: Easy to add new commands via a simple interface.
 
 ---
@@ -56,8 +56,8 @@ A high-performance, lightweight, in-memory Redis-compatible server built from th
 
 ### Build & Run
 ```bash
-# Clone and build
-git clone https://github.com/your-username/redis-java.git
+# Clone and build (replace REPO_URL with the HTTPS or SSH URL of this repository or your fork)
+git clone REPO_URL
 cd redis-java
 mvn clean package
 
@@ -95,7 +95,7 @@ graph TD
 - **Netty Layer**: Handles I/O multiplexing and protocol framing.
 - **Command Registry**: Decouples the protocol handler from command logic.
 - **Storage Layer**: Managed `ConcurrentHashMap` with TTL support.
-- **Expiry Manager**: Background thread using a `DelayQueue` for $O(\log n)$ expiration scheduling.
+- **Expiry Manager**: Background thread using a `DelayQueue` for $O(\log n)$ queue-based scheduling plus average $O(1)$ map access during expiration.
 
 ---
 

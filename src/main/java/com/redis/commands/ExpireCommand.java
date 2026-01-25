@@ -38,6 +38,8 @@ public class ExpireCommand implements ICommand {
             return ERR_VALUE;
         }
 
+        // Note: Negative seconds values are accepted (like Redis) and result in immediate expiration
+        // since the calculated timestamp will be in the past.
         long expiryTimeMillis = System.currentTimeMillis() + (seconds * 1000L);
         boolean success = RedisDatabase.getInstance().setExpiryTime(key, expiryTimeMillis);
         

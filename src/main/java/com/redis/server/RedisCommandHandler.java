@@ -14,6 +14,10 @@ import java.util.List;
 /**
  * Netty channel handler for processing incoming Redis commands.
  * Parses RESP protocol using ByteToMessageDecoder for fragmentation support.
+ * 
+ * IMPORTANT: This handler is instantiated per-channel (see NettyRedisServer.initChannel()),
+ * ensuring thread-safety for the argsBuffer field. Each channel has its own handler instance.
+ * 
  * Optimizations:
  * - Reuses ArrayList for argument parsing
  * - Fast integer parsing without object allocation
@@ -54,7 +58,7 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
             }
 
             // Extract command name and arguments
-            String commandName = argsBuffer.getFirst();
+            String commandName = argsBuffer.get(0);
             ICommand cmd = CommandRegistry.getInstance().get(commandName);
 
             if (cmd == null) {

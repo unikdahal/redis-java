@@ -6,7 +6,7 @@ import io.netty.channel.ChannelHandlerContext;
 
 import java.util.List;
 
-public class LLenCommand implements ICommand{
+public class LLenCommand implements ICommand {
 
     private static final String ERR_WRONG_ARGS = "-ERR wrong number of arguments for 'LLEN' command\r\n";
     private static final String RESP_ZERO = ":0\r\n";
