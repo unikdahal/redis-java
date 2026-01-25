@@ -112,12 +112,13 @@ public final class RedisValue {
 
     /**
      * Create a RedisValue representing a Redis sorted set.
+     * The input map is defensively copied to ensure immutability.
      *
      * @param value mapping of members to their scores (higher scores = higher rank)
-     * @return a RedisValue of type SORTED_SET containing the provided member-score mapping
+     * @return a RedisValue of type SORTED_SET containing a copy of the provided member-score mapping
      */
     public static RedisValue sortedSet(Map<String, Double> value) {
-        return new RedisValue(Type.SORTED_SET, value);
+        return new RedisValue(Type.SORTED_SET, new HashMap<>(value));
     }
 
     // ==================== Type-Safe Accessors ====================
@@ -182,6 +183,7 @@ public final class RedisValue {
 
     /**
      * Return the stored value as a Map representing a Redis sorted set.
+     * Returns an unmodifiable view to maintain immutability.
      *
      * @return the underlying data as a Map<String, Double> where keys are members and values are scores
      * @throws IllegalStateException if the stored type is not {@code SORTED_SET}
@@ -191,7 +193,7 @@ public final class RedisValue {
         if (type != Type.SORTED_SET) {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SORTED_SET, got " + type);
         }
-        return (Map<String, Double>) data;
+        return Collections.unmodifiableMap((Map<String, Double>) data);
     }
 
     /**
