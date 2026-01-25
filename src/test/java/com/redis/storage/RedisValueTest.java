@@ -57,12 +57,23 @@ class RedisValueTest {
     }
 
     @Test
+    void testSortedSetValue() {
+        Map<String, Double> sortedSet = Map.of("member1", 1.0, "member2", 2.5, "member3", 3.0);
+        RedisValue value = RedisValue.sortedSet(sortedSet);
+
+        assertEquals(RedisValue.Type.SORTED_SET, value.getType());
+        assertEquals(sortedSet, value.asSortedSet());
+        assertTrue(value.isType(RedisValue.Type.SORTED_SET));
+    }
+
+    @Test
     void testWrongTypeAccessThrows() {
         RedisValue stringValue = RedisValue.string("test");
 
         assertThrows(IllegalStateException.class, stringValue::asList);
         assertThrows(IllegalStateException.class, stringValue::asSet);
         assertThrows(IllegalStateException.class, stringValue::asHash);
+        assertThrows(IllegalStateException.class, stringValue::asSortedSet);
     }
 
     @Test
@@ -102,50 +113,75 @@ class RedisValueTest {
     }
 
     @Test
+    void testListImmutability() {
+        List<String> original = new ArrayList<>(List.of("a", "b", "c"));
+        RedisValue value = RedisValue.list(original);
+
+        // Modifying the original list should not affect the RedisValue
+        original.add("d");
+        assertEquals(3, value.asList().size());
+        assertFalse(value.asList().contains("d"));
+
+        // The returned list from asList() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asList().add("e"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asList().remove(0));
+        assertThrows(UnsupportedOperationException.class, () -> value.asList().clear());
+    }
+
+    @Test
+    void testSetImmutability() {
+        Set<String> original = new HashSet<>(Set.of("x", "y", "z"));
+        RedisValue value = RedisValue.set(original);
+
+        // Modifying the original set should not affect the RedisValue
+        original.add("w");
+        assertEquals(3, value.asSet().size());
+        assertFalse(value.asSet().contains("w"));
+
+        // The returned set from asSet() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asSet().add("v"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSet().remove("x"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSet().clear());
+    }
+
+    @Test
+    void testHashImmutability() {
+        Map<String, String> original = new HashMap<>(Map.of("key1", "val1", "key2", "val2"));
+        RedisValue value = RedisValue.hash(original);
+
+        // Modifying the original map should not affect the RedisValue
+        original.put("key3", "val3");
+        assertEquals(2, value.asHash().size());
+        assertFalse(value.asHash().containsKey("key3"));
+
+        // The returned map from asHash() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asHash().put("key4", "val4"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asHash().remove("key1"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asHash().clear());
+    }
+
+    @Test
+    void testSortedSetImmutability() {
+        Map<String, Double> original = new HashMap<>(Map.of("member1", 1.0, "member2", 2.0));
+        RedisValue value = RedisValue.sortedSet(original);
+
+        // Modifying the original map should not affect the RedisValue
+        original.put("member3", 3.0);
+        assertEquals(2, value.asSortedSet().size());
+        assertFalse(value.asSortedSet().containsKey("member3"));
+
+        // The returned map from asSortedSet() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asSortedSet().put("member4", 4.0));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSortedSet().remove("member1"));
+        assertThrows(UnsupportedOperationException.class, () -> value.asSortedSet().clear());
+    }
+
+    @Test
     void testToString() {
         RedisValue value = RedisValue.string("hello");
         String str = value.toString();
 
         assertTrue(str.contains("STRING"));
         assertTrue(str.contains("hello"));
-    }
-
-    @Test
-    void testListIsImmutable() {
-        List<String> mutableList = new ArrayList<>();
-        mutableList.add("a");
-        mutableList.add("b");
-        RedisValue value = RedisValue.list(mutableList);
-
-        List<String> returnedList = value.asList();
-        assertThrows(UnsupportedOperationException.class, () -> returnedList.add("c"));
-        assertThrows(UnsupportedOperationException.class, () -> returnedList.remove(0));
-        assertThrows(UnsupportedOperationException.class, () -> returnedList.clear());
-    }
-
-    @Test
-    void testSetIsImmutable() {
-        Set<String> mutableSet = new HashSet<>();
-        mutableSet.add("x");
-        mutableSet.add("y");
-        RedisValue value = RedisValue.set(mutableSet);
-
-        Set<String> returnedSet = value.asSet();
-        assertThrows(UnsupportedOperationException.class, () -> returnedSet.add("z"));
-        assertThrows(UnsupportedOperationException.class, () -> returnedSet.remove("x"));
-        assertThrows(UnsupportedOperationException.class, () -> returnedSet.clear());
-    }
-
-    @Test
-    void testHashIsImmutable() {
-        Map<String, String> mutableMap = new HashMap<>();
-        mutableMap.put("field1", "value1");
-        mutableMap.put("field2", "value2");
-        RedisValue value = RedisValue.hash(mutableMap);
-
-        Map<String, String> returnedMap = value.asHash();
-        assertThrows(UnsupportedOperationException.class, () -> returnedMap.put("field3", "value3"));
-        assertThrows(UnsupportedOperationException.class, () -> returnedMap.remove("field1"));
-        assertThrows(UnsupportedOperationException.class, () -> returnedMap.clear());
     }
 }
