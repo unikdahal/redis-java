@@ -37,7 +37,7 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
             }
 
             // Extract command name and arguments
-            String commandName = args.get(0);
+            String commandName = args.getFirst();
             ICommand cmd = CommandRegistry.getInstance().get(commandName);
 
             if (cmd == null) {

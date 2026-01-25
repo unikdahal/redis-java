@@ -1,20 +1,32 @@
 package com.redis.storage;
 
+import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory key-value store with expiry support using DelayQueue-based cleanup.
  * This is the core data storage for the Redis server.
- * Values are stored as String. Expiry is managed by ExpiryManager (zero-polling approach).
+ *
+ * Supports multiple value types via RedisValue wrapper:
+ * - STRING: Simple string values
+ * - LIST: Ordered list of strings
+ * - SET: Unordered collection of unique strings
+ * - HASH: Map of field-value pairs
+ * - SORTED_SET: Set with scores for ordering
+ *
+ * Expiry is managed by ExpiryManager (zero-polling approach with DelayQueue).
  */
 public class RedisDatabase {
     private static RedisDatabase INSTANCE;
 
+    /**
+     * Internal entry that wraps a RedisValue with optional expiry time.
+     */
     private static class ValueEntry {
-        final String value;
+        final RedisValue value;
         final long expiryMillis; // Long.MAX_VALUE means no expiry
 
-        ValueEntry(String value, long expiryMillis) {
+        ValueEntry(RedisValue value, long expiryMillis) {
             this.value = value;
             this.expiryMillis = expiryMillis;
         }
@@ -24,7 +36,6 @@ public class RedisDatabase {
     private final ExpiryManager expiryManager;
 
     private RedisDatabase() {
-        // Initialize expiry manager with callback to remove expired keys
         this.expiryManager = new ExpiryManager(this::removeKey);
     }
 
@@ -39,62 +50,105 @@ public class RedisDatabase {
         return INSTANCE;
     }
 
+    // ==================== Generic RedisValue Methods ====================
+
     /**
-     * Store a key-value pair without expiry.
+     * Store a RedisValue without expiry.
      */
-    public void put(String key, String value) {
+    public void put(String key, RedisValue value) {
         map.put(key, new ValueEntry(value, Long.MAX_VALUE));
     }
 
     /**
-     * Store a key-value pair with a time-to-live in milliseconds.
-     * The key will automatically be removed when the TTL expires.
+     * Store a RedisValue with a time-to-live in milliseconds.
      */
-    public void put(String key, String value, long ttlMillis) {
+    public void put(String key, RedisValue value, long ttlMillis) {
         if (ttlMillis <= 0) {
-            // Invalid TTL, treat as no expiry
             put(key, value);
             return;
         }
 
         long expiryTimeMillis = System.currentTimeMillis() + ttlMillis;
         map.put(key, new ValueEntry(value, expiryTimeMillis));
-
-        // Schedule expiry with DelayQueue (zero-polling approach)
         expiryManager.scheduleExpiry(key, expiryTimeMillis);
     }
 
     /**
-     * Check if a key exists in the database (not expired).
+     * Retrieve a RedisValue. Returns null if key doesn't exist or has expired.
+     */
+    public RedisValue getValue(String key) {
+        var entry = map.get(key);
+        if (entry == null) return null;
+        if (isExpired(entry)) {
+            map.remove(key, entry);
+            return null;
+        }
+        return entry.value;
+    }
+
+    /**
+     * Get value with expected type. Returns null if key doesn't exist, expired, or type mismatch.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T getTyped(String key, RedisValue.Type expectedType) {
+        RedisValue value = getValue(key);
+        if (value == null || value.getType() != expectedType) {
+            return null;
+        }
+        return (T) value.getData();
+    }
+
+    /**
+     * Get the type of a key's value. Returns null if key doesn't exist.
+     */
+    public RedisValue.Type getType(String key) {
+        RedisValue value = getValue(key);
+        return value != null ? value.getType() : null;
+    }
+
+    // ==================== String Convenience Methods (Backward Compatible) ====================
+
+    /**
+     * Store a string value without expiry.
+     * Convenience method for STRING type.
+     */
+    public void put(String key, String value) {
+        put(key, RedisValue.string(value));
+    }
+
+    /**
+     * Store a string value with TTL.
+     * Convenience method for STRING type.
+     */
+    public void put(String key, String value, long ttlMillis) {
+        put(key, RedisValue.string(value), ttlMillis);
+    }
+
+    /**
+     * Retrieve a string value. Returns null if key doesn't exist, expired, or not a STRING.
+     * Convenience method for STRING type.
+     */
+    public String get(String key) {
+        RedisValue value = getValue(key);
+        if (value == null || value.getType() != RedisValue.Type.STRING) {
+            return null;
+        }
+        return value.asString();
+    }
+
+    // ==================== Key Operations ====================
+
+    /**
+     * Check if a key exists (not expired).
      */
     public boolean exists(String key) {
         var entry = map.get(key);
         if (entry == null) return false;
-        // Check if expired
-        if (entry.expiryMillis != Long.MAX_VALUE && entry.expiryMillis <= System.currentTimeMillis()) {
+        if (isExpired(entry)) {
             map.remove(key, entry);
             return false;
         }
         return true;
-    }
-
-    /**
-     * Retrieve a key's value. Returns null if key doesn't exist or has expired.
-     * Lazy expiry: checks expiry time on access.
-     */
-    public String get(String key) {
-        var entry = map.get(key);
-        if (entry == null) {
-            return null;
-        }
-
-        // Check if expired
-        if (entry.expiryMillis != Long.MAX_VALUE && entry.expiryMillis <= System.currentTimeMillis()) {
-            map.remove(key, entry);
-            return null;
-        }
-
-        return entry.value;
     }
 
     /**
@@ -105,21 +159,25 @@ public class RedisDatabase {
     }
 
     /**
-     * Internal method called by ExpiryManager when a key expires.
-     */
-    private void removeKey(String key) {
-        map.remove(key);
-    }
-
-    /**
      * Remove multiple keys and return the count of removed keys.
      */
-    public int removeAll(java.util.Collection<String> keys) {
+    public int removeAll(Collection<String> keys) {
         int count = 0;
         for (String k : keys) {
             if (remove(k)) count++;
         }
         return count;
+    }
+
+    // ==================== Utility Methods ====================
+
+    private boolean isExpired(ValueEntry entry) {
+        return entry.expiryMillis != Long.MAX_VALUE &&
+               entry.expiryMillis <= System.currentTimeMillis();
+    }
+
+    private void removeKey(String key) {
+        map.remove(key);
     }
 
     /**
