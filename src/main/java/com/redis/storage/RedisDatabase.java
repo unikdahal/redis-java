@@ -75,8 +75,12 @@ public class RedisDatabase {
      *
      * @param key   the key under which to store the value
      * @param value the RedisValue to store
+     * @throws IllegalArgumentException if value is null
      */
     public void put(String key, RedisValue value) {
+        if (value == null) {
+            throw new IllegalArgumentException("Value cannot be null");
+        }
         map.put(key, new ValueEntry(value, Long.MAX_VALUE));
     }
 
@@ -86,8 +90,12 @@ public class RedisDatabase {
      * @param key the key under which to store the value
      * @param value the RedisValue to store
      * @param ttlMillis time-to-live in milliseconds; if less than or equal to zero the value is stored without expiry
+     * @throws IllegalArgumentException if value is null
      */
     public void put(String key, RedisValue value, long ttlMillis) {
+        if (value == null) {
+            throw new IllegalArgumentException("Value cannot be null");
+        }
         if (ttlMillis <= 0) {
             put(key, value);
             return;

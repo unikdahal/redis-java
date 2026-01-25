@@ -187,4 +187,22 @@ public class RedisDatabaseTest {
         t1.join();
         t2.join();
     }
+
+    @Test
+    @DisplayName("Database: Put null RedisValue throws IllegalArgumentException")
+    void testPutNullRedisValue() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            db.put("key", (RedisValue) null);
+        });
+        assertEquals("Value cannot be null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Database: Put null RedisValue with TTL throws IllegalArgumentException")
+    void testPutNullRedisValueWithTtl() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            db.put("key", (RedisValue) null, 1000);
+        });
+        assertEquals("Value cannot be null", exception.getMessage());
+    }
 }
