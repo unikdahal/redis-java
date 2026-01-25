@@ -24,6 +24,14 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
     // Preallocate list to avoid allocations for small commands
     private static final int INITIAL_ARGS_CAPACITY = 16;
 
+    /**
+     * Processes an incoming Netty message containing a RESP array: parses command and arguments, dispatches the command, writes the RESP-formatted response, and releases the received buffer.
+     *
+     * <p>If the parsed argument list is empty or parsing fails, no response is written.</p>
+     *
+     * @param ctx the channel handler context used to write responses and manage the channel
+     * @param msg the incoming message, expected to be a Netty {@code ByteBuf} containing a RESP array
+     */
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf buf = (ByteBuf) msg;
@@ -54,9 +62,12 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
     }
 
     /**
-     * Parse a RESP array from the ByteBuf.
-     * Expected format: *<count>\r\n$<len>\r\n<data>\r\n...\r\n
-     * Optimization: Fast path for common cases, minimal allocations
+     * Parses a RESP array starting at the current reader index of the provided buffer into a list of argument strings.
+     *
+     * The method returns an empty list if the buffer does not contain a well-formed RESP array or if parsing fails.
+     *
+     * @param buf the ByteBuf positioned at the start of a RESP array (expects '*' as the first byte)
+     * @return a List of argument strings in array order, or an empty list on malformed input or parse error
      */
     private List<String> parseRespArray(ByteBuf buf) {
         List<String> result = new ArrayList<>(INITIAL_ARGS_CAPACITY);
