@@ -2,6 +2,7 @@ package com.redis.storage;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * In-memory key-value store with expiry support using DelayQueue-based cleanup.
@@ -50,6 +51,40 @@ public class RedisDatabase {
         return INSTANCE;
     }
 
+    /**
+     * Get the absolute expiry time in milliseconds for a key.
+     * Returns -1 if key doesn't exist.
+     * Returns Long.MAX_VALUE if key exists but has no expiry.
+     */
+    public long getExpiryTime(String key) {
+        var entry = map.get(key);
+        if (entry == null) return -1;
+        if (isExpired(entry)) {
+            map.remove(key, entry);
+            return -1;
+        }
+        return entry.expiryMillis;
+    }
+
+    /**
+     * Set a new expiry time for an existing key.
+     * Returns true if successful, false if key doesn't exist.
+     */
+    public boolean setExpiryTime(String key, long expiryTimeMillis) {
+        AtomicBoolean updated = new AtomicBoolean(false);
+        map.computeIfPresent(key, (k, existing) -> {
+            if (isExpired(existing)) return null;
+            updated.set(true);
+            if (expiryTimeMillis == Long.MAX_VALUE) {
+                expiryManager.clearExpiry(key);
+            } else {
+                expiryManager.scheduleExpiry(key, expiryTimeMillis);
+            }
+            return new ValueEntry(existing.value, expiryTimeMillis);
+        });
+        return updated.get();
+    }
+
     // ==================== Generic RedisValue Methods ====================
 
     /**
@@ -57,6 +92,7 @@ public class RedisDatabase {
      */
     public void put(String key, RedisValue value) {
         map.put(key, new ValueEntry(value, Long.MAX_VALUE));
+        expiryManager.clearExpiry(key);
     }
 
     /**
@@ -155,7 +191,11 @@ public class RedisDatabase {
      * Remove a key from the database.
      */
     public boolean remove(String key) {
-        return map.remove(key) != null;
+        boolean removed = map.remove(key) != null;
+        if (removed) {
+            expiryManager.clearExpiry(key);
+        }
+        return removed;
     }
 
     /**
@@ -216,6 +256,11 @@ public class RedisDatabase {
             // If function returns null, remove the key
             if (newValue == null) {
                 return null;
+            }
+
+            // Micro-optimization: avoid new ValueEntry if value hasn't changed
+            if (newValue == currentValue && validEntry) {
+                return existingEntry;
             }
 
             // Preserve expiry for existing non-expired entries, otherwise no expiry

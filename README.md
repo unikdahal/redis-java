@@ -1,213 +1,130 @@
-# Java Redis Server
+# 🚀 Java Redis Server
 
-A lightweight, high-performance, in-memory Redis-compatible server built with Java 25 and Netty. This project implements a subset of Redis commands and is designed for simplicity, performance, and educational purposes.
+[![Java Version](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.java.net/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/Build-Maven-green.svg)](#)
 
-## Features
+A high-performance, lightweight, in-memory Redis-compatible server built from the ground up using **Java 25** and **Netty**. This project implements core Redis functionality with a focus on low latency, efficient memory usage, and clean architecture.
 
-*   **In-Memory Storage**: Key-value store with optional time-to-live (TTL) support
-*   **Netty-based Server**: Asynchronous, event-driven server for high performance
-*   **Redis Protocol (RESP)**: Implements the Redis Serialization Protocol for communication
-*   **Automatic Key Expiration**: Supports both lazy expiration and background cleanup via DelayQueue
-*   **Thread-Safe Operations**: Uses `ConcurrentHashMap` for thread-safe data storage
-*   **Supported Commands**:
-    *   `SET key value [EX seconds] [PX milliseconds] [NX|XX]`
-    *   `GET key`
-    *   `DEL key [key ...]`
+---
 
-## Architecture
+## ✨ Features
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    NettyRedisServer                         │
-│  ┌─────────────┐    ┌─────────────────────────────────┐    │
-│  │ Boss Group  │────│        Worker Group              │    │
-│  │  (Accept)   │    │  ┌─────────────────────────────┐ │    │
-│  └─────────────┘    │  │   RedisCommandHandler       │ │    │
-│                     │  │   (RESP Parser/Executor)    │ │    │
-│                     │  └─────────────────────────────┘ │    │
-│                     └─────────────────────────────────┘    │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    CommandRegistry                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
-│  │SetCommand│  │GetCommand│  │DelCommand│                  │
-│  └──────────┘  └──────────┘  └──────────┘                  │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     RedisDatabase                           │
-│  ┌─────────────────────┐  ┌─────────────────────────────┐  │
-│  │  ConcurrentHashMap  │  │      ExpiryManager          │  │
-│  │   (Key → Value)     │  │  (DelayQueue-based cleanup) │  │
-│  └─────────────────────┘  └─────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+- **⚡ High Performance**: Built on Netty's asynchronous event-driven framework for massive concurrency.
+- **💾 In-Memory Storage**: Optimized data structures using `ConcurrentHashMap` for thread-safe, lock-free reads.
+- **🔌 Redis Protocol (RESP)**: Full support for the Redis Serialization Protocol, compatible with any standard Redis client (`redis-cli`, `jedis`, `redis-py`, etc.).
+- **⏳ Advanced Expiration**: Dual-strategy expiration (Lazy + Active background cleanup via `DelayQueue`).
+- **🎯 Single-Threaded Execution**: Mimics Redis's atomic command processing model for data consistency.
+- **🏗️ Extensible Command Registry**: Easy to add new commands via a simple interface.
 
-## Project Structure
+---
 
-```
-redis-java/
-├── pom.xml                          # Maven build configuration
-├── README.md                        # This file
-├── src/
-│   ├── main/java/com/redis/
-│   │   ├── commands/                # Command implementations
-│   │   │   ├── ICommand.java        # Command interface
-│   │   │   ├── CommandRegistry.java # Command lookup registry
-│   │   │   ├── SetCommand.java      # SET command
-│   │   │   ├── GetCommand.java      # GET command
-│   │   │   └── DelCommand.java      # DEL command
-│   │   ├── config/
-│   │   │   └── RedisConfig.java     # Server configuration
-│   │   ├── server/
-│   │   │   ├── NettyRedisServer.java    # Main server class
-│   │   │   └── RedisCommandHandler.java # RESP protocol handler
-│   │   ├── storage/
-│   │   │   ├── RedisDatabase.java   # In-memory data store
-│   │   │   └── ExpiryManager.java   # Key expiration manager
-│   │   └── util/
-│   │       └── ExpiryTask.java      # Expiry task implementation
-│   └── test/java/com/redis/
-│       ├── commands/                # Unit tests for commands
-│       └── storage/                 # Unit tests for storage
-└── target/
-    └── redis-server.jar             # Executable JAR
-```
+## 🛠️ Supported Commands
 
-## Getting Started
+### 🔑 Connection & Utility
+| Command | Usage | Description |
+|:---|:---|:---|
+| `PING` | `PING [message]` | Returns `PONG` or the provided message. |
+| `ECHO` | `ECHO message` | Returns the provided message. |
+| `EXPIRE` | `EXPIRE key seconds` | Set a timeout on a key. |
+| `TTL` | `TTL key` | Get the time to live for a key in seconds. |
+
+### 📝 Key-Value Operations
+| Command | Usage | Description |
+|:---|:---|:---|
+| `SET` | `SET key value [EX s] [PX ms] [NX\|XX]` | Set key to value with optional TTL and conditions. |
+| `GET` | `GET key` | Get the value of a key. |
+| `DEL` | `DEL key [key ...]` | Delete one or more keys. |
+
+### 📋 List Operations
+| Command | Usage | Description |
+|:---|:---|:---|
+| `LPUSH` | `LPUSH key element [element ...]` | Prepend one or multiple elements to a list. |
+| `RPUSH` | `RPUSH key element [element ...]` | Append one or multiple elements to a list. |
+| `LPOP` | `LPOP key [count]` | Remove and get the first element(s) of a list. |
+| `LLEN` | `LLEN key` | Get the length of a list. |
+| `LRANGE` | `LRANGE key start stop` | Get a range of elements from a list. |
+| `BLPOP` | `BLPOP key [key ...] timeout` | Remove and get the first element in a list, or block. |
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
+- **JDK 25** or higher (with `--enable-preview`)
+- **Maven 3.9+**
 
-*   Java 25 or higher
-*   Maven 3.9 or higher
+### Build & Run
+```bash
+# Clone and build
+git clone https://github.com/your-username/redis-java.git
+cd redis-java
+mvn clean package
 
-### Building the Project
-
-1.  Clone the repository:
-    ```sh
-    git clone https://github.com/your-username/redis-java.git
-    ```
-2.  Navigate to the project directory:
-    ```sh
-    cd redis-java
-    ```
-3.  Build the project using Maven:
-    ```sh
-    mvn clean install
-    ```
-    This will compile the code, run all tests, and create a runnable JAR file in the `target` directory.
-
-### Running the Server
-
-To start the Redis server, run the following command:
-
-```sh
+# Start the server
 java --enable-preview -jar target/redis-server.jar
 ```
 
-The server will start on the default port (6379).
+The server listens on port **6379** by default.
 
-## Usage
-
-You can connect to the server using any Redis client, such as `redis-cli`.
-
-### SET Command
-
-Basic usage:
-```
-127.0.0.1:6379> SET mykey "Hello, Redis!"
+### Connect with `redis-cli`
+```bash
+redis-cli -p 6379
+127.0.0.1:6379> PING
+PONG
+127.0.0.1:6379> SET framework "Netty"
 OK
+127.0.0.1:6379> GET framework
+"Netty"
 ```
 
-With expiration (EX = seconds, PX = milliseconds):
-```
-127.0.0.1:6379> SET mykey "expiring value" EX 10
-OK
-```
+---
 
-With conditional flags:
-```
-# NX - Only set if key does NOT exist
-127.0.0.1:6379> SET mykey "value" NX
-OK
+## 🏗️ Architecture
 
-# XX - Only set if key DOES exist
-127.0.0.1:6379> SET mykey "new_value" XX
-OK
+```mermaid
+graph TD
+    Client[Redis Client] <--> Netty[Netty EventLoop]
+    Netty <--> Handler[RedisCommandHandler]
+    Handler <--> Registry[CommandRegistry]
+    Registry <--> Commands[Command Implementations]
+    Commands <--> Storage[RedisDatabase]
+    Storage <--> Expiry[ExpiryManager]
 ```
 
-### GET Command
+- **Netty Layer**: Handles I/O multiplexing and protocol framing.
+- **Command Registry**: Decouples the protocol handler from command logic.
+- **Storage Layer**: Managed `ConcurrentHashMap` with TTL support.
+- **Expiry Manager**: Background thread using a `DelayQueue` for $O(\log n)$ expiration scheduling.
 
-```
-127.0.0.1:6379> GET mykey
-"Hello, Redis!"
+---
 
-# Non-existent key returns nil
-127.0.0.1:6379> GET nonexistent
-(nil)
-```
+## 🧪 Testing
 
-### DEL Command
+We maintain high confidence through both unit and integration tests.
 
-Delete single or multiple keys:
-```
-127.0.0.1:6379> SET key1 "value1"
-OK
-127.0.0.1:6379> SET key2 "value2"
-OK
-127.0.0.1:6379> DEL key1 key2
-(integer) 2
-127.0.0.1:6379> GET key1
-(nil)
-```
+```bash
+# Run all tests (Unit + Integration)
+./run_all_tests.sh
 
-## Running Tests
-
-To run the unit tests:
-
-```sh
+# Run only unit tests
 mvn test
 ```
 
-To run tests with verbose output:
+---
 
-```sh
-mvn test -X
-```
+## ⚙️ Configuration
 
-## Configuration
-
-The server can be configured via `src/main/resources/application.properties`:
+Edit `src/main/resources/application.properties`:
 
 | Property | Default | Description |
-|----------|---------|-------------|
-| `redis.port` | 6379 | Server port |
-| `redis.boss.threads` | 1 | Boss thread pool size |
-| `redis.worker.threads` | 1 | Worker thread pool size |
+|:---|:---|:---|
+| `redis.port` | 6379 | Port to listen on. |
+| `redis.boss.threads` | 1 | Number of acceptor threads. |
+| `redis.worker.threads` | 1 | Number of I/O threads (Keep at 1 for Redis semantics). |
 
-## Technical Details
+---
 
-### RESP Protocol
-
-This server implements the Redis Serialization Protocol (RESP) for client-server communication:
-
-- **Simple Strings**: `+OK\r\n`
-- **Errors**: `-ERR message\r\n`
-- **Integers**: `:1\r\n`
-- **Bulk Strings**: `$6\r\nfoobar\r\n`
-- **Null Bulk String**: `$-1\r\n`
-- **Arrays**: `*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n`
-
-### Key Expiration
-
-Keys with TTL are expired using a dual approach:
-1. **Lazy Expiration**: Keys are checked for expiry on access
-2. **Active Expiration**: Background thread removes expired keys using a `DelayQueue`
-
-## License
-
-This project is open source and available under the MIT License.
+## 📄 License
+Distributed under the MIT License. See `LICENSE` for more information.
 

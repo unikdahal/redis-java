@@ -32,6 +32,13 @@ public class CommandRegistry {
         register(new RPushCommand());
         register(new LRangeCommand());
         register(new LPushCommand());
+        register(new PingCommand());
+        register(new EchoCommand());
+        register(new LLenCommand());
+        register(new LPopCommand());
+        register(new BLPopCommand());
+        register(new ExpireCommand());
+        register(new TtlCommand());
     }
 
     /**

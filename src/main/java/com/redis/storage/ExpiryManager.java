@@ -88,6 +88,14 @@ public class ExpiryManager {
         }
     }
 
+    /**
+     * Remove any pending expiry for the given key.
+     * This should be called when a key is deleted or overwritten without TTL.
+     */
+    public void clearExpiry(String key) {
+        keyExpiryMap.remove(key);
+    }
+
     public int getPendingExpiryCount() {
         return expiryQueue.size();
     }
