@@ -106,4 +106,43 @@ class RedisValueTest {
         assertTrue(str.contains("STRING"));
         assertTrue(str.contains("hello"));
     }
+
+    @Test
+    void testListIsImmutable() {
+        List<String> mutableList = new java.util.ArrayList<>();
+        mutableList.add("a");
+        mutableList.add("b");
+        RedisValue value = RedisValue.list(mutableList);
+
+        List<String> returnedList = value.asList();
+        assertThrows(UnsupportedOperationException.class, () -> returnedList.add("c"));
+        assertThrows(UnsupportedOperationException.class, () -> returnedList.remove(0));
+        assertThrows(UnsupportedOperationException.class, () -> returnedList.clear());
+    }
+
+    @Test
+    void testSetIsImmutable() {
+        Set<String> mutableSet = new java.util.HashSet<>();
+        mutableSet.add("x");
+        mutableSet.add("y");
+        RedisValue value = RedisValue.set(mutableSet);
+
+        Set<String> returnedSet = value.asSet();
+        assertThrows(UnsupportedOperationException.class, () -> returnedSet.add("z"));
+        assertThrows(UnsupportedOperationException.class, () -> returnedSet.remove("x"));
+        assertThrows(UnsupportedOperationException.class, () -> returnedSet.clear());
+    }
+
+    @Test
+    void testHashIsImmutable() {
+        Map<String, String> mutableMap = new java.util.HashMap<>();
+        mutableMap.put("field1", "value1");
+        mutableMap.put("field2", "value2");
+        RedisValue value = RedisValue.hash(mutableMap);
+
+        Map<String, String> returnedMap = value.asHash();
+        assertThrows(UnsupportedOperationException.class, () -> returnedMap.put("field3", "value3"));
+        assertThrows(UnsupportedOperationException.class, () -> returnedMap.remove("field1"));
+        assertThrows(UnsupportedOperationException.class, () -> returnedMap.clear());
+    }
 }
