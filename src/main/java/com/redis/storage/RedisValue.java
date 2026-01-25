@@ -1,5 +1,9 @@
 package com.redis.storage;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,10 +40,66 @@ public final class RedisValue {
      *
      * @param type the stored value's {@link Type}
      * @param data the raw data associated with the type (e.g. `String`, `List<String>`, `Set<String>`, or `Map<String,String>`)
+     * @throws IllegalArgumentException if the data type does not match the expected type for the given Type enum
      */
     private RedisValue(Type type, Object data) {
+        // Validate that data matches the expected type
+        validateDataType(type, data);
         this.type = type;
         this.data = data;
+    }
+
+    /**
+     * Validates that the data object matches the expected type for the given Type enum.
+     *
+     * @param type the Type enum value
+     * @param data the data object to validate
+     * @throws IllegalArgumentException if the data type does not match
+     */
+    private static void validateDataType(Type type, Object data) {
+        if (data == null) {
+            throw new IllegalArgumentException("Data cannot be null");
+        }
+
+        switch (type) {
+            case STRING:
+                if (!(data instanceof String)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a String for Type.STRING, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case LIST:
+                if (!(data instanceof List)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a List for Type.LIST, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case SET:
+                if (!(data instanceof Set)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a Set for Type.SET, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case HASH:
+                if (!(data instanceof Map)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a Map for Type.HASH, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            case SORTED_SET:
+                if (!(data instanceof Map)) {
+                    throw new IllegalArgumentException(
+                        "Data must be a Map for Type.SORTED_SET, but got: " + data.getClass().getName()
+                    );
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown type: " + type);
+        }
     }
 
     /**
@@ -53,10 +113,11 @@ public final class RedisValue {
 
     /**
      * Underlying raw data stored in this RedisValue.
+     * Package-private to prevent external callers from breaking immutability guarantees.
      *
      * @return the raw data object; its concrete type corresponds to the instance's {@code Type}
      */
-    public Object getData() {
+    Object getData() {
         return data;
     }
 
@@ -74,32 +135,45 @@ public final class RedisValue {
 
     /**
      * Creates a RedisValue representing a Redis LIST.
+     * The input list is defensively copied to ensure immutability.
      *
      * @param value the list of strings to store as the value
-     * @return the RedisValue typed as LIST containing the provided list
+     * @return the RedisValue typed as LIST containing a copy of the provided list
      */
     public static RedisValue list(List<String> value) {
-        return new RedisValue(Type.LIST, value);
+        return new RedisValue(Type.LIST, List.copyOf(value));
     }
 
     /**
      * Creates a RedisValue representing a Redis SET.
+     * The input set is defensively copied to ensure immutability.
      *
      * @param value the set of string members to store
-     * @return a RedisValue with type SET that wraps the provided set
+     * @return a RedisValue with type SET that wraps a copy of the provided set
      */
     public static RedisValue set(Set<String> value) {
-        return new RedisValue(Type.SET, value);
+        return new RedisValue(Type.SET, Set.copyOf(value));
     }
 
     /**
      * Create a RedisValue that represents a Redis hash from the provided mapping.
+     * The input map is defensively copied to ensure immutability.
      *
      * @param value mapping of hash fields to their string values
-     * @return a RedisValue of type HASH containing the provided map
+     * @return a RedisValue of type HASH containing a copy of the provided map
      */
     public static RedisValue hash(Map<String, String> value) {
-        return new RedisValue(Type.HASH, value);
+        return new RedisValue(Type.HASH, Map.copyOf(value));
+    }
+
+    /**
+     * Create a RedisValue representing a Redis sorted set.
+     *
+     * @param value mapping of members to their scores (higher scores = higher rank)
+     * @return a RedisValue of type SORTED_SET containing the provided member-score mapping
+     */
+    public static RedisValue sortedSet(Map<String, Double> value) {
+        return new RedisValue(Type.SORTED_SET, Map.copyOf(value));
     }
 
     // ==================== Type-Safe Accessors ====================
@@ -119,6 +193,7 @@ public final class RedisValue {
 
     /**
      * Return the underlying value as a {@code List<String>}.
+     * Returns an unmodifiable view to preserve immutability.
      *
      * @return the stored {@code List<String>}
      * @throws RedisWrongTypeException if the stored type is not {@code Type.LIST}
@@ -128,11 +203,12 @@ public final class RedisValue {
         if (type != Type.LIST) {
             throw new RedisWrongTypeException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + type);
         }
-        return (List<String>) data;
+        return Collections.unmodifiableList((List<String>) data);
     }
 
     /**
      * Return the stored value as a set of strings.
+     * Returns an unmodifiable view to preserve immutability.
      *
      * @return the stored value as a {@code Set<String>}
      * @throws RedisWrongTypeException if the stored type is not {@code Type.SET}
@@ -142,11 +218,12 @@ public final class RedisValue {
         if (type != Type.SET) {
             throw new RedisWrongTypeException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + type);
         }
-        return (Set<String>) data;
+        return Collections.unmodifiableSet((Set<String>) data);
     }
 
     /**
      * Return the stored value as a Map representing a Redis hash.
+     * Returns an unmodifiable view to preserve immutability.
      *
      * @return the underlying data as a Map<String, String>
      * @throws RedisWrongTypeException if the stored type is not {@code HASH}
@@ -156,7 +233,36 @@ public final class RedisValue {
         if (type != Type.HASH) {
             throw new RedisWrongTypeException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + type);
         }
-        return (Map<String, String>) data;
+        return Collections.unmodifiableMap((Map<String, String>) data);
+    }
+
+    /**
+     * Return the stored value as a Map representing a Redis sorted set.
+     * Returns an unmodifiable view to preserve immutability.
+     *
+     * @return an unmodifiable view of the underlying data as a Map<String, Double> where keys are members and values are scores
+     * @throws IllegalStateException if the stored type is not {@code SORTED_SET}
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Double> asSortedSet() {
+        if (type != Type.SORTED_SET) {
+            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SORTED_SET, got " + type);
+        }
+        return Collections.unmodifiableMap((Map<String, Double>) data);
+    }
+
+    /**
+     * Return the stored value as a Map representing a Redis sorted set.
+     *
+     * @return the underlying data as a Map<String, Double> where keys are members and values are scores
+     * @throws IllegalStateException if the stored type is not {@code SORTED_SET}
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Double> asSortedSet() {
+        if (type != Type.SORTED_SET) {
+            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SORTED_SET, got " + type);
+        }
+        return (Map<String, Double>) data;
     }
 
     /**

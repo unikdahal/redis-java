@@ -25,6 +25,7 @@ public class CommandRegistry {
         register(new SetCommand());
         register(new GetCommand());
         register(new DelCommand());
+        register(new RPushCommand());
     }
 
     /**
