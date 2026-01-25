@@ -193,4 +193,35 @@ public class RedisDatabase {
     public void shutdown() {
         expiryManager.shutdown();
     }
+
+    // ==================== Atomic Operations ====================
+
+    /**
+     * Atomically compute a new value for a key.
+     * Thread-safe read-modify-write operation using ConcurrentHashMap.compute().
+     * Preserves TTL for existing non-expired keys.
+     *
+     * @param key the key to compute
+     * @param remappingFunction function that takes existing RedisValue (or null) and returns new value
+     */
+    public void compute(String key, java.util.function.Function<RedisValue, RedisValue> remappingFunction) {
+        map.compute(key, (k, existingEntry) -> {
+            // Check if entry exists and is not expired
+            boolean validEntry = existingEntry != null && !isExpired(existingEntry);
+            RedisValue currentValue = validEntry ? existingEntry.value : null;
+
+            // Apply remapping function
+            RedisValue newValue = remappingFunction.apply(currentValue);
+
+            // If function returns null, remove the key
+            if (newValue == null) {
+                return null;
+            }
+
+            // Preserve expiry for existing non-expired entries, otherwise no expiry
+            long expiry = validEntry ? existingEntry.expiryMillis : Long.MAX_VALUE;
+
+            return new ValueEntry(newValue, expiry);
+        });
+    }
 }

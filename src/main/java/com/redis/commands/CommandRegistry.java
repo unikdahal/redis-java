@@ -31,6 +31,7 @@ public class CommandRegistry {
         register(new DelCommand());
         register(new RPushCommand());
         register(new LRangeCommand());
+        register(new LPushCommand());
     }
 
     /**
