@@ -4,7 +4,9 @@ import com.redis.storage.RedisDatabase;
 import com.redis.storage.RedisValue;
 import io.netty.channel.ChannelHandlerContext;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.ListIterator;
 
 public class LRangeCommand implements ICommand {
     private static final String ERR_WRONG_ARGS = "-ERR wrong number of arguments for 'LRANGE' command\r\n";
@@ -18,7 +20,7 @@ public class LRangeCommand implements ICommand {
             return ERR_WRONG_ARGS;
         }
 
-        String key = args.get(0);
+        String key = args.getFirst();
         int start, stop;
 
         try {
@@ -77,9 +79,12 @@ public class LRangeCommand implements ICommand {
         StringBuilder sb = new StringBuilder();
         sb.append('*').append(count).append("\r\n");
 
-        for (int i = start; i <= stop; i++) {
-            String element = list.get(i);
-            sb.append('$').append(element.length()).append("\r\n");
+        //Using ListIterator here to reduce the time complexity from O(n^2) to O(n) in case of linked list
+        ListIterator<String> it = list.listIterator(start);
+        for (int i = start; i <= stop && it.hasNext(); i++) {
+            String element = it.next();
+            byte[] bytes = element.getBytes(StandardCharsets.UTF_8);
+            sb.append('$').append(bytes.length).append("\r\n");
             sb.append(element).append("\r\n");
         }
 
