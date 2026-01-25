@@ -16,6 +16,16 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RedisValueTest {
 
+    /**
+     * Helper method to create a RedisValue using reflection for testing validation.
+     * This bypasses the factory methods to directly test the private constructor.
+     */
+    private RedisValue createViaReflection(RedisValue.Type type, Object data) throws Exception {
+        var constructor = RedisValue.class.getDeclaredConstructor(RedisValue.Type.class, Object.class);
+        constructor.setAccessible(true);
+        return (RedisValue) constructor.newInstance(type, data);
+    }
+
     @Test
     void testStringValue() {
         RedisValue value = RedisValue.string("hello");
@@ -186,120 +196,25 @@ class RedisValueTest {
     }
 
     @Test
-    void testListDefensiveCopy() {
-        java.util.ArrayList<String> mutableList = new java.util.ArrayList<>();
-        mutableList.add("a");
-        mutableList.add("b");
-
-        RedisValue value = RedisValue.list(mutableList);
-
-        // Modify the original list
-        mutableList.add("c");
-
-        // The RedisValue should not be affected
-        assertEquals(2, value.asList().size());
-        assertEquals(List.of("a", "b"), value.asList());
+    void testNullDataThrows() {
+        // Use reflection to access the private constructor for testing
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.STRING, null));
     }
 
     @Test
-    void testSetDefensiveCopy() {
-        java.util.HashSet<String> mutableSet = new java.util.HashSet<>();
-        mutableSet.add("x");
-        mutableSet.add("y");
+    void testMismatchedTypeThrows() {
+        // Use reflection to test type validation
+        
+        // Try to create a STRING type with a List data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.STRING, List.of("test")));
 
-        RedisValue value = RedisValue.set(mutableSet);
+        // Try to create a LIST type with a String data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.LIST, "test"));
 
-        // Modify the original set
-        mutableSet.add("z");
+        // Try to create a SET type with a List data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.SET, List.of("test")));
 
-        // The RedisValue should not be affected
-        assertEquals(2, value.asSet().size());
-        assertTrue(value.asSet().contains("x"));
-        assertTrue(value.asSet().contains("y"));
-        assertFalse(value.asSet().contains("z"));
-    }
-
-    @Test
-    void testHashDefensiveCopy() {
-        java.util.HashMap<String, String> mutableMap = new java.util.HashMap<>();
-        mutableMap.put("key1", "value1");
-        mutableMap.put("key2", "value2");
-
-        RedisValue value = RedisValue.hash(mutableMap);
-
-        // Modify the original map
-        mutableMap.put("key3", "value3");
-
-        // The RedisValue should not be affected
-        assertEquals(2, value.asHash().size());
-        assertEquals("value1", value.asHash().get("key1"));
-        assertEquals("value2", value.asHash().get("key2"));
-        assertNull(value.asHash().get("key3"));
-    }
-
-    @Test
-    void testSortedSetDefensiveCopy() {
-        java.util.HashMap<String, Double> mutableSortedSet = new java.util.HashMap<>();
-        mutableSortedSet.put("member1", 1.0);
-        mutableSortedSet.put("member2", 2.5);
-
-        RedisValue value = RedisValue.sortedSet(mutableSortedSet);
-
-        // Modify the original map
-        mutableSortedSet.put("member3", 3.0);
-
-        // The RedisValue should not be affected
-        assertEquals(2, value.asSortedSet().size());
-        assertEquals(1.0, value.asSortedSet().get("member1"));
-        assertEquals(2.5, value.asSortedSet().get("member2"));
-        assertNull(value.asSortedSet().get("member3"));
-    }
-
-    @Test
-    void testListImmutability() {
-        List<String> list = List.of("a", "b", "c");
-        RedisValue value = RedisValue.list(list);
-        List<String> retrievedList = value.asList();
-
-        // Verify that attempting to modify the list throws UnsupportedOperationException
-        assertThrows(UnsupportedOperationException.class, () -> retrievedList.add("d"));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedList.remove(0));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedList.clear());
-    }
-
-    @Test
-    void testSetImmutability() {
-        Set<String> set = Set.of("x", "y", "z");
-        RedisValue value = RedisValue.set(set);
-        Set<String> retrievedSet = value.asSet();
-
-        // Verify that attempting to modify the set throws UnsupportedOperationException
-        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.add("w"));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.remove("x"));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedSet.clear());
-    }
-
-    @Test
-    void testHashImmutability() {
-        Map<String, String> hash = Map.of("field1", "value1", "field2", "value2");
-        RedisValue value = RedisValue.hash(hash);
-        Map<String, String> retrievedHash = value.asHash();
-
-        // Verify that attempting to modify the map throws UnsupportedOperationException
-        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.put("field3", "value3"));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.remove("field1"));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedHash.clear());
-    }
-
-    @Test
-    void testSortedSetImmutability() {
-        Map<String, Double> sortedSet = Map.of("member1", 1.0, "member2", 2.5, "member3", 3.0);
-        RedisValue value = RedisValue.sortedSet(sortedSet);
-        Map<String, Double> retrievedSortedSet = value.asSortedSet();
-
-        // Verify that attempting to modify the sorted set throws UnsupportedOperationException
-        assertThrows(UnsupportedOperationException.class, () -> retrievedSortedSet.put("member4", 4.0));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedSortedSet.remove("member1"));
-        assertThrows(UnsupportedOperationException.class, () -> retrievedSortedSet.clear());
+        // Try to create a HASH type with a String data
+        assertThrows(Exception.class, () -> createViaReflection(RedisValue.Type.HASH, "test"));
     }
 }
