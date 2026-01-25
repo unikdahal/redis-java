@@ -25,6 +25,17 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
     // Preallocate list to avoid allocations for small commands
     private static final int INITIAL_ARGS_CAPACITY = 16;
 
+    /**
+     * Handle an inbound Netty message containing a RESP array, parse it into command and arguments,
+     * dispatch the command via the registry, and write the RESP-formatted response back to the channel.
+     *
+     * <p>If the parsed argument list is empty this method returns without writing a response.
+     * If no command handler exists for the parsed command name an RESP error is written.
+     * The method always releases the provided ByteBuf before returning.
+     *
+     * @param ctx the Netty channel context used to write responses and manage the channel
+     * @param msg the incoming message, expected to be a ByteBuf containing a RESP array (command + arguments)
+     */
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf buf = (ByteBuf) msg;

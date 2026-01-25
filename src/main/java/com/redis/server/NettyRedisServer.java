@@ -23,6 +23,15 @@ public class NettyRedisServer {
         this.config = config;
     }
 
+    /**
+     * Starts the Netty-based Redis server, binds it to the configured port, and blocks until the server channel closes.
+     *
+     * The method initializes boss and worker event loop groups, configures the server bootstrap to accept
+     * connections and install a Redis command handler for each channel, and then binds to the configured port.
+     * When the server stops (or an exception occurs), event loop groups and the RedisDatabase singleton are shut down.
+     *
+     * @throws Exception if the server fails to bind, is interrupted while waiting, or another error occurs during startup or runtime
+     */
     public void run() throws Exception {
         /*
          * Boss Group: handles incoming connection requests.

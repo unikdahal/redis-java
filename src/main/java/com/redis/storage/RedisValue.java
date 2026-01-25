@@ -31,20 +31,30 @@ public final class RedisValue {
     private final Type type;
     private final Object data;
 
+    /**
+     * Create a RedisValue with the specified type and associated raw data.
+     *
+     * @param type the stored value's {@link Type}
+     * @param data the raw data associated with the type (e.g. `String`, `List<String>`, `Set<String>`, or `Map<String,String>`)
+     */
     private RedisValue(Type type, Object data) {
         this.type = type;
         this.data = data;
     }
 
     /**
-     * Get the type of this value.
+     * The Redis data type tag associated with this value.
+     *
+     * @return the {@code Type} enum constant that identifies the stored Redis data type
      */
     public Type getType() {
         return type;
     }
 
     /**
-     * Get the raw data object.
+     * Underlying raw data stored in this RedisValue.
+     *
+     * @return the raw data object; its concrete type corresponds to the instance's {@code Type}
      */
     public Object getData() {
         return data;
@@ -53,28 +63,40 @@ public final class RedisValue {
     // ==================== Factory Methods ====================
 
     /**
-     * Create a STRING value.
+     * Create a RedisValue representing a Redis string.
+     *
+     * @param value the string content to store
+     * @return a RedisValue of type STRING containing the provided string
      */
     public static RedisValue string(String value) {
         return new RedisValue(Type.STRING, value);
     }
 
     /**
-     * Create a LIST value.
+     * Creates a RedisValue representing a Redis LIST.
+     *
+     * @param value the list of strings to store as the value
+     * @return the RedisValue typed as LIST containing the provided list
      */
     public static RedisValue list(List<String> value) {
         return new RedisValue(Type.LIST, value);
     }
 
     /**
-     * Create a SET value.
+     * Creates a RedisValue representing a Redis SET.
+     *
+     * @param value the set of string members to store
+     * @return a RedisValue with type SET that wraps the provided set
      */
     public static RedisValue set(Set<String> value) {
         return new RedisValue(Type.SET, value);
     }
 
     /**
-     * Create a HASH value.
+     * Create a RedisValue that represents a Redis hash from the provided mapping.
+     *
+     * @param value mapping of hash fields to their string values
+     * @return a RedisValue of type HASH containing the provided map
      */
     public static RedisValue hash(Map<String, String> value) {
         return new RedisValue(Type.HASH, value);
@@ -83,7 +105,10 @@ public final class RedisValue {
     // ==================== Type-Safe Accessors ====================
 
     /**
-     * Get value as String. Throws if type mismatch.
+     * Retrieve the stored value as a String.
+     *
+     * @return the value cast to a `String`
+     * @throws IllegalStateException if the stored type is not STRING
      */
     public String asString() {
         if (type != Type.STRING) {
@@ -93,7 +118,10 @@ public final class RedisValue {
     }
 
     /**
-     * Get value as List. Throws if type mismatch.
+     * Return the underlying value as a {@code List<String>}.
+     *
+     * @return the stored {@code List<String>}
+     * @throws IllegalStateException if the stored type is not {@code Type.LIST}
      */
     @SuppressWarnings("unchecked")
     public List<String> asList() {
@@ -104,7 +132,10 @@ public final class RedisValue {
     }
 
     /**
-     * Get value as Set. Throws if type mismatch.
+     * Return the stored value as a set of strings.
+     *
+     * @return the stored value as a {@code Set<String>}
+     * @throws IllegalStateException if the stored type is not {@code Type.SET}
      */
     @SuppressWarnings("unchecked")
     public Set<String> asSet() {
@@ -115,7 +146,10 @@ public final class RedisValue {
     }
 
     /**
-     * Get value as Hash (Map). Throws if type mismatch.
+     * Return the stored value as a Map representing a Redis hash.
+     *
+     * @return the underlying data as a Map<String, String>
+     * @throws IllegalStateException if the stored type is not {@code HASH}
      */
     @SuppressWarnings("unchecked")
     public Map<String, String> asHash() {
@@ -126,17 +160,33 @@ public final class RedisValue {
     }
 
     /**
-     * Check if this value is of the specified type.
+     * Determines whether this value has the specified Redis type.
+     *
+     * @param expectedType the type to compare against
+     * @return {@code true} if the stored type equals {@code expectedType}, {@code false} otherwise
      */
     public boolean isType(Type expectedType) {
         return this.type == expectedType;
     }
 
+    /**
+     * String representation of the RedisValue including its type and data.
+     *
+     * @return a string in the form {@code RedisValue{type=..., data=...}}
+     */
     @Override
     public String toString() {
         return "RedisValue{type=" + type + ", data=" + data + "}";
     }
 
+    /**
+     * Determines whether the given object is equal to this RedisValue.
+     *
+     * Compares both the stored Type and the underlying data for value-based equality.
+     *
+     * @param o the object to compare with
+     * @return `true` if `o` is a `RedisValue` with the same `Type` and equal data, `false` otherwise
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -145,6 +195,11 @@ public final class RedisValue {
         return type == that.type && java.util.Objects.equals(data, that.data);
     }
 
+    /**
+     * Computes a hash code for this RedisValue based on its type and data.
+     *
+     * @return the hash code derived from the value's type and data
+     */
     @Override
     public int hashCode() {
         return java.util.Objects.hash(type, data);
