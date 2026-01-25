@@ -13,7 +13,6 @@ import java.util.Set;
  * - LIST: Ordered list of strings (supports LPUSH, RPUSH, LRANGE, etc.)
  * - SET: Unordered collection of unique strings (supports SADD, SMEMBERS, etc.)
  * - HASH: Map of field-value pairs (supports HSET, HGET, HGETALL, etc.)
- * - SORTED_SET: Set with scores for ordering (supports ZADD, ZRANGE, etc.)
  */
 public final class RedisValue {
 
@@ -24,8 +23,7 @@ public final class RedisValue {
         STRING,
         LIST,
         SET,
-        HASH,
-        SORTED_SET
+        HASH
     }
 
     private final Type type;
