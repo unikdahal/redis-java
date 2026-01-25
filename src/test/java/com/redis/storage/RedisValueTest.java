@@ -99,6 +99,48 @@ class RedisValueTest {
     }
 
     @Test
+    void testListImmutability() {
+        List<String> original = new java.util.ArrayList<>(List.of("a", "b", "c"));
+        RedisValue value = RedisValue.list(original);
+
+        // Modifying the original list should not affect the RedisValue
+        original.add("d");
+        assertEquals(3, value.asList().size());
+        assertFalse(value.asList().contains("d"));
+
+        // The returned list from asList() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asList().add("e"));
+    }
+
+    @Test
+    void testSetImmutability() {
+        Set<String> original = new java.util.HashSet<>(Set.of("x", "y", "z"));
+        RedisValue value = RedisValue.set(original);
+
+        // Modifying the original set should not affect the RedisValue
+        original.add("w");
+        assertEquals(3, value.asSet().size());
+        assertFalse(value.asSet().contains("w"));
+
+        // The returned set from asSet() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asSet().add("v"));
+    }
+
+    @Test
+    void testHashImmutability() {
+        Map<String, String> original = new java.util.HashMap<>(Map.of("key1", "val1", "key2", "val2"));
+        RedisValue value = RedisValue.hash(original);
+
+        // Modifying the original map should not affect the RedisValue
+        original.put("key3", "val3");
+        assertEquals(2, value.asHash().size());
+        assertFalse(value.asHash().containsKey("key3"));
+
+        // The returned map from asHash() should be unmodifiable
+        assertThrows(UnsupportedOperationException.class, () -> value.asHash().put("key4", "val4"));
+    }
+
+    @Test
     void testToString() {
         RedisValue value = RedisValue.string("hello");
         String str = value.toString();
