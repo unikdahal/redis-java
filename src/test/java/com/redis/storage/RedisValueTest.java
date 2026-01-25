@@ -2,6 +2,9 @@ package com.redis.storage;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -109,7 +112,7 @@ class RedisValueTest {
 
     @Test
     void testListIsImmutable() {
-        List<String> mutableList = new java.util.ArrayList<>();
+        List<String> mutableList = new ArrayList<>();
         mutableList.add("a");
         mutableList.add("b");
         RedisValue value = RedisValue.list(mutableList);
@@ -122,7 +125,7 @@ class RedisValueTest {
 
     @Test
     void testSetIsImmutable() {
-        Set<String> mutableSet = new java.util.HashSet<>();
+        Set<String> mutableSet = new HashSet<>();
         mutableSet.add("x");
         mutableSet.add("y");
         RedisValue value = RedisValue.set(mutableSet);
@@ -135,7 +138,7 @@ class RedisValueTest {
 
     @Test
     void testHashIsImmutable() {
-        Map<String, String> mutableMap = new java.util.HashMap<>();
+        Map<String, String> mutableMap = new HashMap<>();
         mutableMap.put("field1", "value1");
         mutableMap.put("field2", "value2");
         RedisValue value = RedisValue.hash(mutableMap);
