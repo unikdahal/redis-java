@@ -49,7 +49,7 @@ public class ExpiryBugTest {
         // 4. Wait for original TTL
         Thread.sleep(200);
 
-        // BUG: Background cleaner might remove it.
+        // Regression test: previously, the background cleaner could incorrectly remove this key.
         assertEquals("newVal", db.get(key), "Key should still exist even if previously it had a TTL");
     }
 }
