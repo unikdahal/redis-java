@@ -24,6 +24,24 @@ public class LPopCommand implements ICommand {
     private static final String RESP_NIL = "$-1\r\n";
     private static final String RESP_EMPTY_ARRAY = "*0\r\n";
 
+    /**
+     * Execute the LPOP command on the database and produce a RESP-formatted reply.
+     *
+     * <p>The first element of {@code args} is the key whose list is popped. If a second
+     * argument is provided it is parsed as a non-negative integer count; when present the
+     * command returns an array of up to that many popped elements, otherwise it returns a
+     * single bulk string for the removed element.</p>
+     *
+     * @param args command arguments: {@code args.get(0)} is the key, {@code args.get(1)}
+     *             when present is the optional non-negative pop count
+     * @param ctx  Netty channel context (unused by this implementation)
+     * @return a RESP reply string:
+     *         - an error reply for wrong argument count, non-integer or negative count, or wrong type,
+     *         - `nil` (RESP bulk nil) when no element is removed in single-element mode,
+     *         - an empty RESP array when count mode is used and nothing is removed,
+     *         - a RESP bulk string for a single removed element,
+     *         - a RESP array of bulk strings for multiple removed elements.
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.isEmpty() || args.size() > 2) {
@@ -120,6 +138,11 @@ public class LPopCommand implements ICommand {
         return sb.toString();
     }
 
+    /**
+     * Provides the command's name identifier.
+     *
+     * @return the command name "LPOP"
+     */
     @Override
     public String name() {
         return "LPOP";

@@ -12,7 +12,7 @@ TOTAL=0
 PASSED=0
 FAILED=0
 
-# Send RESP command and get response
+# send_cmd sends a Redis command (space-separated) encoded in RESP to the configured HOST:PORT and echoes the server response; echoes an empty string on failure.
 send_cmd() {
     local cmd="$1"
     # Convert command to RESP format
@@ -27,7 +27,15 @@ send_cmd() {
     printf '%b' "$resp" | nc -w $NC_TIMEOUT $HOST $PORT 2>/dev/null || echo ""
 }
 
-# Run test and check result
+# run_test runs a test by sending a Redis command and verifying that the response contains an expected substring; it updates TOTAL/PASSED/FAILED and prints a PASS or FAIL line.
+# 
+# Arguments:
+#   name  - test name (used in output)
+#   cmd   - Redis command string to send (RESP will be generated)
+#   expected - substring expected to appear in the response; CR/LF are ignored for matching
+#
+# Exit:
+#   Returns 0 on success (expected substring found), 1 on failure (not found).
 run_test() {
     local name="$1"
     local cmd="$2"
@@ -56,7 +64,7 @@ run_test() {
     fi
 }
 
-# Run test expecting substring match
+# run_test_contains runs a test named by the first argument: it sends the given command, verifies every subsequent argument substring appears in the response, updates TOTAL/PASSED/FAILED counters, and prints a PASS or FAIL line with details.
 run_test_contains() {
     local name="$1"
     local cmd="$2"
