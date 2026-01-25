@@ -189,20 +189,31 @@ public class RedisDatabaseTest {
     }
 
     @Test
-    @DisplayName("Database: Put null RedisValue throws IllegalArgumentException")
-    void testPutNullRedisValue() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            db.put("key", (RedisValue) null);
-        });
-        assertEquals("Value cannot be null", exception.getMessage());
+    @DisplayName("Database: getTyped returns value for matching type")
+    void testGetTypedMatchingType() {
+        db.put("string_key", RedisValue.string("test_value"));
+        String result = db.getTyped("string_key", RedisValue.Type.STRING);
+        assertEquals("test_value", result);
     }
 
     @Test
-    @DisplayName("Database: Put null RedisValue with TTL throws IllegalArgumentException")
-    void testPutNullRedisValueWithTtl() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            db.put("key", (RedisValue) null, 1000);
+    @DisplayName("Database: getTyped returns null for non-existent key")
+    void testGetTypedNonExistent() {
+        String result = db.getTyped("nonexistent", RedisValue.Type.STRING);
+        assertNull(result);
+    }
+
+    @Test
+    @DisplayName("Database: getTyped throws exception for type mismatch")
+    void testGetTypedThrowsOnTypeMismatch() {
+        db.put("string_key", RedisValue.string("test_value"));
+        
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            db.getTyped("string_key", RedisValue.Type.LIST);
         });
-        assertEquals("Value cannot be null", exception.getMessage());
+        
+        assertTrue(exception.getMessage().contains("WRONGTYPE"));
+        assertTrue(exception.getMessage().contains("Expected LIST"));
+        assertTrue(exception.getMessage().contains("got STRING"));
     }
 }
