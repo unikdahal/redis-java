@@ -80,17 +80,16 @@ class RedisValueTest {
     void testWrongTypeAccessThrows() {
         RedisValue stringValue = RedisValue.string("test");
 
-        assertThrows(IllegalStateException.class, stringValue::asList);
-        assertThrows(IllegalStateException.class, stringValue::asSet);
-        assertThrows(IllegalStateException.class, stringValue::asHash);
-        assertThrows(IllegalStateException.class, stringValue::asSortedSet);
+        assertThrows(RedisWrongTypeException.class, stringValue::asList);
+        assertThrows(RedisWrongTypeException.class, stringValue::asSet);
+        assertThrows(RedisWrongTypeException.class, stringValue::asHash);
     }
 
     @Test
     void testWrongTypeErrorMessage() {
         RedisValue listValue = RedisValue.list(List.of("a"));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, listValue::asString);
+        RedisWrongTypeException ex = assertThrows(RedisWrongTypeException.class, listValue::asString);
         assertTrue(ex.getMessage().contains("WRONGTYPE"));
         assertTrue(ex.getMessage().contains("LIST"));
     }

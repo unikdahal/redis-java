@@ -182,11 +182,11 @@ public final class RedisValue {
      * Retrieve the stored value as a String.
      *
      * @return the value cast to a `String`
-     * @throws IllegalStateException if the stored type is not STRING
+     * @throws RedisWrongTypeException if the stored type is not STRING
      */
     public String asString() {
         if (type != Type.STRING) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected STRING, got " + type);
+            throw new RedisWrongTypeException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected STRING, got " + type);
         }
         return (String) data;
     }
@@ -195,13 +195,13 @@ public final class RedisValue {
      * Return the underlying value as a {@code List<String>}.
      * Returns an unmodifiable view to preserve immutability.
      *
-     * @return an unmodifiable view of the stored {@code List<String>}
-     * @throws IllegalStateException if the stored type is not {@code Type.LIST}
+     * @return the stored {@code List<String>}
+     * @throws RedisWrongTypeException if the stored type is not {@code Type.LIST}
      */
     @SuppressWarnings("unchecked")
     public List<String> asList() {
         if (type != Type.LIST) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + type);
+            throw new RedisWrongTypeException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + type);
         }
         return Collections.unmodifiableList((List<String>) data);
     }
@@ -210,13 +210,13 @@ public final class RedisValue {
      * Return the stored value as a set of strings.
      * Returns an unmodifiable view to preserve immutability.
      *
-     * @return an unmodifiable view of the stored value as a {@code Set<String>}
-     * @throws IllegalStateException if the stored type is not {@code Type.SET}
+     * @return the stored value as a {@code Set<String>}
+     * @throws RedisWrongTypeException if the stored type is not {@code Type.SET}
      */
     @SuppressWarnings("unchecked")
     public Set<String> asSet() {
         if (type != Type.SET) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + type);
+            throw new RedisWrongTypeException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + type);
         }
         return Collections.unmodifiableSet((Set<String>) data);
     }
@@ -225,13 +225,13 @@ public final class RedisValue {
      * Return the stored value as a Map representing a Redis hash.
      * Returns an unmodifiable view to preserve immutability.
      *
-     * @return an unmodifiable view of the underlying data as a Map<String, String>
-     * @throws IllegalStateException if the stored type is not {@code HASH}
+     * @return the underlying data as a Map<String, String>
+     * @throws RedisWrongTypeException if the stored type is not {@code HASH}
      */
     @SuppressWarnings("unchecked")
     public Map<String, String> asHash() {
         if (type != Type.HASH) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + type);
+            throw new RedisWrongTypeException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + type);
         }
         return Collections.unmodifiableMap((Map<String, String>) data);
     }

@@ -31,6 +31,7 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
      *
      * <p>If the parsed argument list is empty this method returns without writing a response.
      * If no command handler exists for the parsed command name an RESP error is written.
+     * If a RedisWrongTypeException is thrown during command execution, it is caught and converted to a RESP error.
      * The method always releases the provided ByteBuf before returning.
      *
      * @param ctx the Netty channel context used to write responses and manage the channel
@@ -54,10 +55,15 @@ public class RedisCommandHandler extends ChannelInboundHandlerAdapter {
             if (cmd == null) {
                 writeResponse(ctx, "-ERR unknown command '" + commandName + "'\r\n");
             } else {
-                // Create sublist for command args (avoids creating new ArrayList)
-                List<String> commandArgs = args.size() > 1 ? args.subList(1, args.size()) : List.of();
-                String resp = cmd.execute(commandArgs, ctx);
-                writeResponse(ctx, resp);
+                try {
+                    // Create sublist for command args (avoids creating new ArrayList)
+                    List<String> commandArgs = args.size() > 1 ? args.subList(1, args.size()) : List.of();
+                    String resp = cmd.execute(commandArgs, ctx);
+                    writeResponse(ctx, resp);
+                } catch (com.redis.storage.RedisWrongTypeException e) {
+                    // Convert RedisWrongTypeException to RESP error
+                    writeResponse(ctx, "-" + e.getMessage() + "\r\n");
+                }
             }
 
         } finally {
