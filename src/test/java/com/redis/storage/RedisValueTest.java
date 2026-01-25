@@ -106,4 +106,56 @@ class RedisValueTest {
         assertTrue(str.contains("STRING"));
         assertTrue(str.contains("hello"));
     }
+
+    @Test
+    void testListDefensiveCopy() {
+        java.util.ArrayList<String> mutableList = new java.util.ArrayList<>();
+        mutableList.add("a");
+        mutableList.add("b");
+
+        RedisValue value = RedisValue.list(mutableList);
+
+        // Modify the original list
+        mutableList.add("c");
+
+        // The RedisValue should not be affected
+        assertEquals(2, value.asList().size());
+        assertEquals(List.of("a", "b"), value.asList());
+    }
+
+    @Test
+    void testSetDefensiveCopy() {
+        java.util.HashSet<String> mutableSet = new java.util.HashSet<>();
+        mutableSet.add("x");
+        mutableSet.add("y");
+
+        RedisValue value = RedisValue.set(mutableSet);
+
+        // Modify the original set
+        mutableSet.add("z");
+
+        // The RedisValue should not be affected
+        assertEquals(2, value.asSet().size());
+        assertTrue(value.asSet().contains("x"));
+        assertTrue(value.asSet().contains("y"));
+        assertFalse(value.asSet().contains("z"));
+    }
+
+    @Test
+    void testHashDefensiveCopy() {
+        java.util.HashMap<String, String> mutableMap = new java.util.HashMap<>();
+        mutableMap.put("key1", "value1");
+        mutableMap.put("key2", "value2");
+
+        RedisValue value = RedisValue.hash(mutableMap);
+
+        // Modify the original map
+        mutableMap.put("key3", "value3");
+
+        // The RedisValue should not be affected
+        assertEquals(2, value.asHash().size());
+        assertEquals("value1", value.asHash().get("key1"));
+        assertEquals("value2", value.asHash().get("key2"));
+        assertNull(value.asHash().get("key3"));
+    }
 }

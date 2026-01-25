@@ -79,7 +79,7 @@ public final class RedisValue {
      * @return the RedisValue typed as LIST containing the provided list
      */
     public static RedisValue list(List<String> value) {
-        return new RedisValue(Type.LIST, value);
+        return new RedisValue(Type.LIST, List.copyOf(value));
     }
 
     /**
@@ -89,7 +89,7 @@ public final class RedisValue {
      * @return a RedisValue with type SET that wraps the provided set
      */
     public static RedisValue set(Set<String> value) {
-        return new RedisValue(Type.SET, value);
+        return new RedisValue(Type.SET, Set.copyOf(value));
     }
 
     /**
@@ -99,7 +99,7 @@ public final class RedisValue {
      * @return a RedisValue of type HASH containing the provided map
      */
     public static RedisValue hash(Map<String, String> value) {
-        return new RedisValue(Type.HASH, value);
+        return new RedisValue(Type.HASH, Map.copyOf(value));
     }
 
     // ==================== Type-Safe Accessors ====================
