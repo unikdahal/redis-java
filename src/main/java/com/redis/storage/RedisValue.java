@@ -1,5 +1,9 @@
 package com.redis.storage;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,10 +57,11 @@ public final class RedisValue {
 
     /**
      * Underlying raw data stored in this RedisValue.
+     * Package-private to prevent external callers from breaking immutability guarantees.
      *
      * @return the raw data object; its concrete type corresponds to the instance's {@code Type}
      */
-    public Object getData() {
+    Object getData() {
         return data;
     }
 
@@ -74,32 +79,35 @@ public final class RedisValue {
 
     /**
      * Creates a RedisValue representing a Redis LIST.
+     * The input list is defensively copied to ensure immutability.
      *
      * @param value the list of strings to store as the value
-     * @return the RedisValue typed as LIST containing the provided list
+     * @return the RedisValue typed as LIST containing a copy of the provided list
      */
     public static RedisValue list(List<String> value) {
-        return new RedisValue(Type.LIST, value);
+        return new RedisValue(Type.LIST, new ArrayList<>(value));
     }
 
     /**
      * Creates a RedisValue representing a Redis SET.
+     * The input set is defensively copied to ensure immutability.
      *
      * @param value the set of string members to store
-     * @return a RedisValue with type SET that wraps the provided set
+     * @return a RedisValue with type SET that wraps a copy of the provided set
      */
     public static RedisValue set(Set<String> value) {
-        return new RedisValue(Type.SET, value);
+        return new RedisValue(Type.SET, new HashSet<>(value));
     }
 
     /**
      * Create a RedisValue that represents a Redis hash from the provided mapping.
+     * The input map is defensively copied to ensure immutability.
      *
      * @param value mapping of hash fields to their string values
-     * @return a RedisValue of type HASH containing the provided map
+     * @return a RedisValue of type HASH containing a copy of the provided map
      */
     public static RedisValue hash(Map<String, String> value) {
-        return new RedisValue(Type.HASH, value);
+        return new RedisValue(Type.HASH, new HashMap<>(value));
     }
 
     /**
@@ -129,8 +137,9 @@ public final class RedisValue {
 
     /**
      * Return the underlying value as a {@code List<String>}.
+     * Returns an unmodifiable view to preserve immutability.
      *
-     * @return the stored {@code List<String>}
+     * @return an unmodifiable view of the stored {@code List<String>}
      * @throws IllegalStateException if the stored type is not {@code Type.LIST}
      */
     @SuppressWarnings("unchecked")
@@ -138,13 +147,14 @@ public final class RedisValue {
         if (type != Type.LIST) {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + type);
         }
-        return (List<String>) data;
+        return Collections.unmodifiableList((List<String>) data);
     }
 
     /**
      * Return the stored value as a set of strings.
+     * Returns an unmodifiable view to preserve immutability.
      *
-     * @return the stored value as a {@code Set<String>}
+     * @return an unmodifiable view of the stored value as a {@code Set<String>}
      * @throws IllegalStateException if the stored type is not {@code Type.SET}
      */
     @SuppressWarnings("unchecked")
@@ -152,13 +162,14 @@ public final class RedisValue {
         if (type != Type.SET) {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + type);
         }
-        return (Set<String>) data;
+        return Collections.unmodifiableSet((Set<String>) data);
     }
 
     /**
      * Return the stored value as a Map representing a Redis hash.
+     * Returns an unmodifiable view to preserve immutability.
      *
-     * @return the underlying data as a Map<String, String>
+     * @return an unmodifiable view of the underlying data as a Map<String, String>
      * @throws IllegalStateException if the stored type is not {@code HASH}
      */
     @SuppressWarnings("unchecked")
@@ -166,7 +177,7 @@ public final class RedisValue {
         if (type != Type.HASH) {
             throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + type);
         }
-        return (Map<String, String>) data;
+        return Collections.unmodifiableMap((Map<String, String>) data);
     }
 
     /**
