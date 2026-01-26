@@ -304,6 +304,16 @@ send_cmd "DEL type_str type_list" > /dev/null
 run_test "TYPE-after-del" "TYPE type_str" "+none"
 run_test "TYPE-wrong-args" "TYPE k1 k2" "-ERR wrong number of arguments"
 
+# ==================== STREAM Tests (5) ====================
+echo ""
+echo "--- STREAM Tests ---"
+send_cmd "DEL stream1" > /dev/null
+run_test_contains "XADD-auto" "XADD stream1 * f1 v1" "-"
+run_test "TYPE-stream" "TYPE stream1" "+stream"
+run_test_contains "XRANGE-all" "XRANGE stream1 - +" "f1" "v1"
+run_test_contains "XREAD-basic" "XREAD STREAMS stream1 0" "stream1" "f1" "v1"
+run_test "XREAD-nil" "XREAD STREAMS stream1 9999999999999-0" "*-1"
+
 # ==================== Combined Tests (100+) ====================
 echo ""
 echo "--- Combined Tests ---"

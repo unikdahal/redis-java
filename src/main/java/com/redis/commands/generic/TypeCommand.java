@@ -22,7 +22,7 @@ public class TypeCommand implements ICommand {
             return ERR_WRONG_ARGS;
         }
 
-        String key = args.get(0);
+        String key = args.getFirst();
         RedisValue.Type type = RedisDatabase.getInstance().getType(key);
 
         if (type == null) {
@@ -35,6 +35,7 @@ public class TypeCommand implements ICommand {
             case SET -> "+set\r\n";
             case HASH -> "+hash\r\n";
             case SORTED_SET -> "+zset\r\n";
+            case STREAM -> "+stream\r\n";
         };
     }
 

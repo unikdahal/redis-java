@@ -49,6 +49,13 @@ Detailed documentation for each command can be found in the [docs/commands](./do
 | `LRANGE` | `LRANGE key start stop` | [LRANGE.md](./docs/commands/LRANGE.md) |
 | `BLPOP` | `BLPOP key [key ...] timeout` | [BLPOP.md](./docs/commands/BLPOP.md) |
 
+### 🌊 Stream Operations
+| Command | Usage | Documentation |
+|:---|:---|:---|
+| `XADD` | `XADD key ID field value [field v ...]` | [XADD.md](./docs/commands/XADD.md) |
+| `XRANGE` | `XRANGE key start end [COUNT c]` | [XRANGE.md](./docs/commands/XRANGE.md) |
+| `XREAD` | `XREAD [COUNT c] [BLOCK ms] STREAMS k [k ...] id [id ...]` | [XREAD.md](./docs/commands/XREAD.md) |
+
 ---
 
 ## 🚀 Getting Started
