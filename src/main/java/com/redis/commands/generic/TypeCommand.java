@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * TYPE key
  * Returns the string representation of the type of the value stored at key.
- * The different types that can be returned are: string, list, set, zset, hash and stream.
+ * The different types that can be returned are: string, list, set, zset and hash.
  * If the key does not exist, none is returned.
  */
 public class TypeCommand implements ICommand {
