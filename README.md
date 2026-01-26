@@ -2,7 +2,7 @@
 
 [![Java Version](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.java.net/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/Build-Maven-green.svg)](#)
+[![Java CI](https://github.com/unikdahal/redis-java/actions/workflows/ci.yml/badge.svg)](https://github.com/unikdahal/redis-java/actions/workflows/ci.yml)
 
 A high-performance, lightweight, in-memory Redis-compatible server built from the ground up using **Java 25** and **Netty**. This project implements core Redis functionality with a focus on low latency, efficient memory usage, and clean architecture.
 
