@@ -1,8 +1,11 @@
 package com.redis.storage;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Wrapper class for Redis values supporting multiple data types.
@@ -141,24 +144,38 @@ public sealed interface RedisValue permits
     }
 
     record ListValue(List<String> list) implements RedisValue {
+        public ListValue {
+            list = Collections.synchronizedList(new ArrayList<>(list));
+        }
         @Override public Type getType() { return Type.LIST; }
         @Override public Object getData() { return list; }
         @Override public String toString() { return "RedisValue{type=LIST, data=" + list + "}"; }
     }
 
     record SetValue(Set<String> set) implements RedisValue {
+        public SetValue {
+            Set<String> newSet = ConcurrentHashMap.newKeySet();
+            newSet.addAll(set);
+            set = newSet;
+        }
         @Override public Type getType() { return Type.SET; }
         @Override public Object getData() { return set; }
         @Override public String toString() { return "RedisValue{type=SET, data=" + set + "}"; }
     }
 
     record HashValue(Map<String, String> hash) implements RedisValue {
+        public HashValue {
+            hash = new ConcurrentHashMap<>(hash);
+        }
         @Override public Type getType() { return Type.HASH; }
         @Override public Object getData() { return hash; }
         @Override public String toString() { return "RedisValue{type=HASH, data=" + hash + "}"; }
     }
 
     record SortedSetValue(Map<String, Double> sortedSet) implements RedisValue {
+        public SortedSetValue {
+            sortedSet = new ConcurrentHashMap<>(sortedSet);
+        }
         @Override public Type getType() { return Type.SORTED_SET; }
         @Override public Object getData() { return sortedSet; }
         @Override public String toString() { return "RedisValue{type=SORTED_SET, data=" + sortedSet + "}"; }
