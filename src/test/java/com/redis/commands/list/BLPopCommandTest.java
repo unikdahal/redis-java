@@ -1,7 +1,4 @@
 package com.redis.commands.list;
-import com.redis.commands.generic.*;
-import com.redis.commands.string.*;
-import com.redis.commands.list.*;
 
 import com.redis.storage.RedisDatabase;
 import com.redis.storage.RedisValue;
@@ -14,7 +11,10 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -97,7 +97,7 @@ class BLPopCommandTest {
         // Verify element was removed
         List<String> remaining = db.getValue("mylist").asList();
         assertEquals(1, remaining.size());
-        assertEquals("second", remaining.get(0));
+        assertEquals("second", remaining.getFirst());
 
         db.remove("mylist");
     }

@@ -28,7 +28,7 @@ public class PingCommand implements ICommand {
         // PING [message] - if message provided, echo it as bulk string; error on too many args
         if (args != null) {
             if (args.size() == 1) {
-                String msg = args.get(0);
+                String msg = args.getFirst();
                 return "$" + msg.length() + "\r\n" + msg + "\r\n";
             }
             if (args.size() > 1) {

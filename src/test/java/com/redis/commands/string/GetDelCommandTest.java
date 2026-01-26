@@ -1,13 +1,11 @@
 package com.redis.commands.string;
-import com.redis.commands.generic.*;
-import com.redis.commands.string.*;
-import com.redis.commands.list.*;
 
+import com.redis.commands.generic.DelCommand;
 import com.redis.storage.RedisDatabase;
 import io.netty.channel.ChannelHandlerContext;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;

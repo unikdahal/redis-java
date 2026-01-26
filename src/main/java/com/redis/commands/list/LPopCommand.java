@@ -50,7 +50,7 @@ public class LPopCommand implements ICommand {
             return ERR_WRONG_ARGS;
         }
 
-        String key = args.get(0);
+        String key = args.getFirst();
         int count = 1;
         boolean returnArray = false;
 
@@ -67,7 +67,7 @@ public class LPopCommand implements ICommand {
         }
 
         if (count == 0) {
-            return returnArray ? RESP_EMPTY_ARRAY : RESP_NIL;
+            return RESP_EMPTY_ARRAY;
         }
 
         RedisDatabase db = RedisDatabase.getInstance();
@@ -126,7 +126,7 @@ public class LPopCommand implements ICommand {
 
         // Single element mode (no count argument)
         if (!returnArray) {
-            String element = popped.get(0);
+            String element = popped.getFirst();
             return "$" + element.length() + "\r\n" + element + "\r\n";
         }
 

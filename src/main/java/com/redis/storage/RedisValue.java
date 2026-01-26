@@ -71,8 +71,8 @@ public sealed interface RedisValue permits
      * Get value as String. Throws if type mismatch.
      */
     default String asString() {
-        if (this instanceof StringValue s) {
-            return s.value();
+        if (this instanceof StringValue(String value)) {
+            return value;
         }
         throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected STRING, got " + getType());
     }
@@ -80,10 +80,9 @@ public sealed interface RedisValue permits
     /**
      * Get value as List. Throws if type mismatch.
      */
-    @SuppressWarnings("unchecked")
     default List<String> asList() {
-        if (this instanceof ListValue l) {
-            return l.list();
+        if (this instanceof ListValue(List<String> list)) {
+            return list;
         }
         throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + getType());
     }
@@ -91,10 +90,9 @@ public sealed interface RedisValue permits
     /**
      * Get value as Set. Throws if type mismatch.
      */
-    @SuppressWarnings("unchecked")
     default Set<String> asSet() {
-        if (this instanceof SetValue s) {
-            return s.set();
+        if (this instanceof SetValue(Set<String> set)) {
+            return set;
         }
         throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + getType());
     }
@@ -102,10 +100,9 @@ public sealed interface RedisValue permits
     /**
      * Get value as Hash (Map). Throws if type mismatch.
      */
-    @SuppressWarnings("unchecked")
     default Map<String, String> asHash() {
-        if (this instanceof HashValue h) {
-            return h.hash();
+        if (this instanceof HashValue(Map<String, String> hash)) {
+            return hash;
         }
         throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + getType());
     }

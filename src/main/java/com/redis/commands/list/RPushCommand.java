@@ -32,7 +32,7 @@ public class RPushCommand implements ICommand {
             return ERR_WRONG_ARGS;
         }
 
-        String key = args.get(0);
+        String key = args.getFirst();
         RedisDatabase db = RedisDatabase.getInstance();
 
         AtomicInteger resultSize = new AtomicInteger(-1);

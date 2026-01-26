@@ -1,13 +1,10 @@
 package com.redis.commands.list;
-import com.redis.commands.generic.*;
-import com.redis.commands.string.*;
-import com.redis.commands.list.*;
 
 import com.redis.storage.RedisDatabase;
 import com.redis.storage.RedisValue;
+import io.netty.channel.ChannelHandlerContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import io.netty.channel.ChannelHandlerContext;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 

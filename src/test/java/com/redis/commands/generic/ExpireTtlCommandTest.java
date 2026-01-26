@@ -1,7 +1,4 @@
 package com.redis.commands.generic;
-import com.redis.commands.generic.*;
-import com.redis.commands.string.*;
-import com.redis.commands.list.*;
 
 import com.redis.storage.RedisDatabase;
 import io.netty.channel.ChannelHandlerContext;
@@ -11,8 +8,7 @@ import org.mockito.Mockito;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ExpireTtlCommandTest {
 
@@ -47,8 +43,8 @@ public class ExpireTtlCommandTest {
 
         // TTL should be -2 (expired)
         assertEquals(":-2\r\n", ttl.execute(List.of(key), ctx));
-        
+
         // Key should be gone
-        assertEquals(null, db.get(key));
+        assertNull(db.get(key));
     }
 }

@@ -87,6 +87,7 @@ echo "PID: $REDIS_PID"
 RETRIES=20
 SLEEP_MS=0.25
 READY=1
+# shellcheck disable=SC2034
 for i in $(seq 1 $RETRIES); do
     if nc -z localhost $PORT >/dev/null 2>&1; then
         READY=0

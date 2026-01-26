@@ -1,15 +1,12 @@
 package com.redis.commands.list;
-import com.redis.commands.generic.*;
-import com.redis.commands.string.*;
-import com.redis.commands.list.*;
 
 import com.redis.storage.RedisDatabase;
 import com.redis.storage.RedisValue;
+import io.netty.channel.ChannelHandlerContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import io.netty.channel.ChannelHandlerContext;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -59,7 +56,7 @@ class LPushCommandTest {
         assertNotNull(value);
         assertEquals(RedisValue.Type.LIST, value.getType());
         assertEquals(1, value.asList().size());
-        assertEquals("value1", value.asList().get(0));
+        assertEquals("value1", value.asList().getFirst());
 
         db.remove("lpushtest1");
     }
@@ -139,7 +136,7 @@ class LPushCommandTest {
         command.execute(List.of("linkedtest", "element"), ctx);
 
         RedisValue value = db.getValue("linkedtest");
-        assertTrue(value.getData() instanceof LinkedList<?>);
+        assertInstanceOf(LinkedList.class, value.getData());
 
         db.remove("linkedtest");
     }

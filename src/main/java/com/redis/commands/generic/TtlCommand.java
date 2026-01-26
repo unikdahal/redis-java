@@ -31,7 +31,7 @@ public class TtlCommand implements ICommand {
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.isEmpty()) return ERR_WRONG_ARGS;
 
-        String key = args.get(0);
+        String key = args.getFirst();
         long expiryTime = RedisDatabase.getInstance().getExpiryTime(key);
 
         if (expiryTime == -1) {

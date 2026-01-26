@@ -19,7 +19,7 @@ public class EchoCommand implements ICommand {
         if (args == null || args.size() != 1) {
             return "-ERR wrong number of arguments for 'ECHO' command\r\n";
         }
-        String msg = args.get(0);
+        String msg = args.getFirst();
         return "$" + msg.length() + "\r\n" + msg + "\r\n";
     }
 

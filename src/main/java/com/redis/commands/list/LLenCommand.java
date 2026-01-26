@@ -29,7 +29,7 @@ public class LLenCommand implements ICommand {
             return ERR_WRONG_ARGS;
         }
 
-        String key = args.get(0);
+        String key = args.getFirst();
         RedisValue value = RedisDatabase.getInstance().getValue(key);
 
         if (value == null) {

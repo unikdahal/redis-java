@@ -1,7 +1,4 @@
 package com.redis.commands.list;
-import com.redis.commands.generic.*;
-import com.redis.commands.string.*;
-import com.redis.commands.list.*;
 
 import com.redis.storage.RedisDatabase;
 import com.redis.storage.RedisValue;
