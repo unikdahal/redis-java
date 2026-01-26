@@ -67,7 +67,10 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
                 // Create a sublist for command args (view only)
                 List<String> commandArgs = argsBuffer.size() > 1 ? argsBuffer.subList(1, argsBuffer.size()) : List.of();
                 String resp = cmd.execute(commandArgs, ctx);
-                writeResponse(ctx, resp);
+                // null response means async handling (e.g., BLPOP)
+                if (resp != null) {
+                    writeResponse(ctx, resp);
+                }
             }
         }
     }
