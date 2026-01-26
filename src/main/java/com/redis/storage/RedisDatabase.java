@@ -23,15 +23,7 @@ public class RedisDatabase {
     /**
      * Internal entry that wraps a RedisValue with optional expiry time.
      */
-    private static class ValueEntry {
-        final RedisValue value;
-        final long expiryMillis; // Long.MAX_VALUE means no expiry
-
-        ValueEntry(RedisValue value, long expiryMillis) {
-            this.value = value;
-            this.expiryMillis = expiryMillis;
-        }
-    }
+    private record ValueEntry(RedisValue value, long expiryMillis) { }
 
     private final ConcurrentHashMap<String, ValueEntry> map = new ConcurrentHashMap<>();
     private final ExpiryManager expiryManager;
@@ -69,7 +61,7 @@ public class RedisDatabase {
             map.remove(key, entry);
             return -1;
         }
-        return entry.expiryMillis;
+        return entry.expiryMillis();
     }
 
     /**
@@ -92,7 +84,7 @@ public class RedisDatabase {
             } else {
                 expiryManager.scheduleExpiry(key, expiryTimeMillis);
             }
-            return new ValueEntry(existing.value, expiryTimeMillis);
+            return new ValueEntry(existing.value(), expiryTimeMillis);
         });
         return updated.get();
     }
@@ -136,7 +128,7 @@ public class RedisDatabase {
             map.remove(key, entry);
             return null;
         }
-        return entry.value;
+        return entry.value();
     }
 
     /**
@@ -232,8 +224,8 @@ public class RedisDatabase {
     // ==================== Utility Methods ====================
 
     private boolean isExpired(ValueEntry entry) {
-        return entry.expiryMillis != Long.MAX_VALUE &&
-               entry.expiryMillis <= System.currentTimeMillis();
+        return entry.expiryMillis() != Long.MAX_VALUE &&
+               entry.expiryMillis() <= System.currentTimeMillis();
     }
 
     private void removeKey(String key) {
@@ -271,7 +263,7 @@ public class RedisDatabase {
         map.compute(key, (k, existingEntry) -> {
             // Check if entry exists and is not expired
             boolean validEntry = existingEntry != null && !isExpired(existingEntry);
-            RedisValue currentValue = validEntry ? existingEntry.value : null;
+            RedisValue currentValue = validEntry ? existingEntry.value() : null;
 
             // Apply remapping function
             RedisValue newValue = remappingFunction.apply(currentValue);
@@ -287,7 +279,7 @@ public class RedisDatabase {
             }
 
             // Preserve expiry for existing non-expired entries, otherwise no expiry
-            long expiry = validEntry ? existingEntry.expiryMillis : Long.MAX_VALUE;
+            long expiry = validEntry ? existingEntry.expiryMillis() : Long.MAX_VALUE;
 
             return new ValueEntry(newValue, expiry);
         });
