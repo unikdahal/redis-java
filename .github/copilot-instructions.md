@@ -11,10 +11,6 @@ This repository contains a lightweight, high-performance, in-memory Redis-compat
 - JUnit 5 and Mockito for testing
 - RESP (Redis Serialization Protocol) for client-server communication
 
-**Important Note on Java Version:** The project is configured for Java 25 with preview features, but many development environments may have Java 17 or other versions installed. If you encounter "invalid target release: 25" errors, you have two options:
-1. Install Java 25 and configure it as the active JDK
-2. Temporarily adjust the `pom.xml` to use the available Java version (update `maven.compiler.source` and `maven.compiler.target` properties), keeping in mind this is for development/testing only
-
 ## Build Instructions
 
 ### Prerequisites
