@@ -10,15 +10,28 @@ public class PingCommand implements ICommand {
     /**
      * Handle the PING command by echoing a provided message or returning the standard PONG response.
      *
+     * <p>Redis semantics:
+     * <ul>
+     *   <li>{@code PING} with no arguments returns {@code +PONG\r\n}</li>
+     *   <li>{@code PING message} returns {@code $&lt;length&gt;\r\n&lt;message&gt;\r\n}</li>
+     *   <li>{@code PING} with more than one argument returns an error</li>
+     * </ul>
+     *
      * @param args list of command arguments; if it contains exactly one element that element is echoed back
-     * @return `+PONG\r\n` when no message is supplied, otherwise a RESP bulk string containing the provided message in the form `$<length>\r\n<message>\r\n`
+     * @return {@code +PONG\r\n} when no message is supplied, a RESP bulk string containing the provided message
+     *         when exactly one argument is provided, or a RESP error when more than one argument is supplied
      */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
-        // PING [message] - if message provided, echo it as bulk string
-        if (args != null && args.size() == 1) {
-            String msg = args.get(0);
-            return "$" + msg.length() + "\r\n" + msg + "\r\n";
+        // PING [message] - if message provided, echo it as bulk string; error on too many args
+        if (args != null) {
+            if (args.size() == 1) {
+                String msg = args.get(0);
+                return "$" + msg.length() + "\r\n" + msg + "\r\n";
+            }
+            if (args.size() > 1) {
+                return "-ERR wrong number of arguments for 'ping' command\r\n";
+            }
         }
         return RESP_PONG;
     }
