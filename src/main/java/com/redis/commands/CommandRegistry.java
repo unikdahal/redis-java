@@ -2,45 +2,34 @@ package com.redis.commands;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Registry for all available Redis commands.
  * Supports dynamic command registration and lookup.
- * This is a singleton initialized with built-in commands.
+ * This is a singleton initialized with built-in commands via ServiceLoader.
  *
  * Optimizations:
  * - Case-insensitive lookups with single toUpperCase() call
  * - ConcurrentHashMap with capacity hints for faster lookup
+ * - Dynamic discovery via ServiceLoader for easy extensibility
  */
 public class CommandRegistry {
     private static CommandRegistry INSTANCE;
 
-    private final Map<String, ICommand> registry = new ConcurrentHashMap<>(16);
+    private final Map<String, ICommand> registry = new ConcurrentHashMap<>(32);
 
     /**
-     * Initialize the singleton registry and register the built-in Redis command implementations.
-     *
-     * Registers the default commands: SetCommand, GetCommand, DelCommand, RPushCommand,
-     * LRangeCommand, LPushCommand, PingCommand, EchoCommand, LLenCommand, LPopCommand,
-     * BLPopCommand, ExpireCommand, and TtlCommand.
+     * Initialize the singleton registry and register all commands found via ServiceLoader.
      */
     private CommandRegistry() {
-        // Register built-in commands
-        register(new SetCommand());
-        register(new GetCommand());
-        register(new DelCommand());
-        register(new RPushCommand());
-        register(new LRangeCommand());
-        register(new LPushCommand());
-        register(new PingCommand());
-        register(new EchoCommand());
-        register(new LLenCommand());
-        register(new LPopCommand());
-        register(new BLPopCommand());
-        register(new ExpireCommand());
-        register(new TtlCommand());
+        ServiceLoader<ICommand> loader = ServiceLoader.load(ICommand.class);
+        for (ICommand cmd : loader) {
+            register(cmd);
+        }
+        System.out.println("[Redis] Registered " + registry.size() + " commands");
     }
 
     /**

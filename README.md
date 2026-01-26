@@ -14,37 +14,39 @@ A high-performance, lightweight, in-memory Redis-compatible server built from th
 - **💾 In-Memory Storage**: Optimized data structures using `ConcurrentHashMap` for thread-safe, lock-free reads.
 - **🔌 Redis Protocol (RESP)**: Implements the Redis Serialization Protocol, compatible with any standard Redis client (`redis-cli`, `jedis`, `redis-py`, etc.).
 - **⏳ Advanced Expiration**: Dual-strategy expiration (Lazy + Active background cleanup via `DelayQueue`).
-- **🎯 Single-Threaded Execution**: Primarily single-threaded command execution for predictable behavior; note that some blocking commands (e.g., `BLPOP`) currently block the I/O thread and do **not** yet match Redis's non-blocking event-driven handling.
+- **🎯 Single-Threaded Execution**: Primarily single-threaded command execution for predictable behavior; blocking commands (e.g., `BLPOP`) are handled asynchronously using Netty's event loop to avoid blocking I/O.
 - **🏗️ Extensible Command Registry**: Easy to add new commands via a simple interface.
 
 ---
 
 ## 🛠️ Supported Commands
 
+Detailed documentation for each command can be found in the [docs/commands](./docs/commands) directory.
+
 ### 🔑 Connection & Utility
-| Command | Usage | Description |
+| Command | Usage | Documentation |
 |:---|:---|:---|
-| `PING` | `PING [message]` | Returns `PONG` or the provided message. |
-| `ECHO` | `ECHO message` | Returns the provided message. |
-| `EXPIRE` | `EXPIRE key seconds` | Set a timeout on a key. |
-| `TTL` | `TTL key` | Get the time to live for a key in seconds. |
+| `PING` | `PING [message]` | [PING.md](./docs/commands/PING.md) |
+| `ECHO` | `ECHO message` | [ECHO.md](./docs/commands/ECHO.md) |
+| `EXPIRE` | `EXPIRE key seconds` | [EXPIRE.md](./docs/commands/EXPIRE.md) |
+| `TTL` | `TTL key` | [TTL.md](./docs/commands/TTL.md) |
 
 ### 📝 Key-Value Operations
-| Command | Usage | Description |
+| Command | Usage | Documentation |
 |:---|:---|:---|
-| `SET` | `SET key value [EX s] [PX ms] [NX\|XX]` | Set key to value with optional TTL and conditions. |
-| `GET` | `GET key` | Get the value of a key. |
-| `DEL` | `DEL key [key ...]` | Delete one or more keys. |
+| `SET` | `SET key value [EX s] [PX ms] [NX\|XX]` | [SET.md](./docs/commands/SET.md) |
+| `GET` | `GET key` | [GET.md](./docs/commands/GET.md) |
+| `DEL` | `DEL key [key ...]` | [DEL.md](./docs/commands/DEL.md) |
 
 ### 📋 List Operations
-| Command | Usage | Description |
+| Command | Usage | Documentation |
 |:---|:---|:---|
-| `LPUSH` | `LPUSH key element [element ...]` | Prepend one or multiple elements to a list. |
-| `RPUSH` | `RPUSH key element [element ...]` | Append one or multiple elements to a list. |
-| `LPOP` | `LPOP key [count]` | Remove and get the first element(s) of a list. |
-| `LLEN` | `LLEN key` | Get the length of a list. |
-| `LRANGE` | `LRANGE key start stop` | Get a range of elements from a list. |
-| `BLPOP` | `BLPOP key [key ...] timeout` | Remove and get the first element in a list, or block. |
+| `LPUSH` | `LPUSH key element [element ...]` | [LPUSH.md](./docs/commands/LPUSH.md) |
+| `RPUSH` | `RPUSH key element [element ...]` | [RPUSH.md](./docs/commands/RPUSH.md) |
+| `LPOP` | `LPOP key [count]` | [LPOP.md](./docs/commands/LPOP.md) |
+| `LLEN` | `LLEN key` | [LLEN.md](./docs/commands/LLEN.md) |
+| `LRANGE` | `LRANGE key start stop` | [LRANGE.md](./docs/commands/LRANGE.md) |
+| `BLPOP` | `BLPOP key [key ...] timeout` | [BLPOP.md](./docs/commands/BLPOP.md) |
 
 ---
 

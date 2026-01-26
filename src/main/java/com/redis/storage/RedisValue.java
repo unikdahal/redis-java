@@ -6,21 +6,18 @@ import java.util.Set;
 
 /**
  * Wrapper class for Redis values supporting multiple data types.
- * Immutable value container with type information.
- *
- * Supported types:
- * - STRING: Simple string values
- * - LIST: Ordered list of strings (supports LPUSH, RPUSH, LRANGE, etc.)
- * - SET: Unordered collection of unique strings (supports SADD, SMEMBERS, etc.)
- * - HASH: Map of field-value pairs (supports HSET, HGET, HGETALL, etc.)
- * - SORTED_SET: Set with scores for ordering (supports ZADD, ZRANGE, etc.)
+ * Using Java 25 sealed interface and records for high scalability and type safety.
  */
-public final class RedisValue {
+public sealed interface RedisValue permits 
+    RedisValue.StringValue, 
+    RedisValue.ListValue, 
+    RedisValue.SetValue, 
+    RedisValue.HashValue {
 
     /**
      * Redis data types.
      */
-    public enum Type {
+    enum Type {
         STRING,
         LIST,
         SET,
@@ -28,56 +25,44 @@ public final class RedisValue {
         SORTED_SET
     }
 
-    private final Type type;
-    private final Object data;
-
-    private RedisValue(Type type, Object data) {
-        this.type = type;
-        this.data = data;
-    }
-
     /**
      * Get the type of this value.
      */
-    public Type getType() {
-        return type;
-    }
+    Type getType();
 
     /**
      * Get the raw data object.
      */
-    public Object getData() {
-        return data;
-    }
+    Object getData();
 
     // ==================== Factory Methods ====================
 
     /**
      * Create a STRING value.
      */
-    public static RedisValue string(String value) {
-        return new RedisValue(Type.STRING, value);
+    static RedisValue string(String value) {
+        return new StringValue(value);
     }
 
     /**
      * Create a LIST value.
      */
-    public static RedisValue list(List<String> value) {
-        return new RedisValue(Type.LIST, value);
+    static RedisValue list(List<String> value) {
+        return new ListValue(value);
     }
 
     /**
      * Create a SET value.
      */
-    public static RedisValue set(Set<String> value) {
-        return new RedisValue(Type.SET, value);
+    static RedisValue set(Set<String> value) {
+        return new SetValue(value);
     }
 
     /**
      * Create a HASH value.
      */
-    public static RedisValue hash(Map<String, String> value) {
-        return new RedisValue(Type.HASH, value);
+    static RedisValue hash(Map<String, String> value) {
+        return new HashValue(value);
     }
 
     // ==================== Type-Safe Accessors ====================
@@ -85,68 +70,76 @@ public final class RedisValue {
     /**
      * Get value as String. Throws if type mismatch.
      */
-    public String asString() {
-        if (type != Type.STRING) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected STRING, got " + type);
+    default String asString() {
+        if (this instanceof StringValue s) {
+            return s.value();
         }
-        return (String) data;
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected STRING, got " + getType());
     }
 
     /**
      * Get value as List. Throws if type mismatch.
      */
     @SuppressWarnings("unchecked")
-    public List<String> asList() {
-        if (type != Type.LIST) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + type);
+    default List<String> asList() {
+        if (this instanceof ListValue l) {
+            return l.list();
         }
-        return (List<String>) data;
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected LIST, got " + getType());
     }
 
     /**
      * Get value as Set. Throws if type mismatch.
      */
     @SuppressWarnings("unchecked")
-    public Set<String> asSet() {
-        if (type != Type.SET) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + type);
+    default Set<String> asSet() {
+        if (this instanceof SetValue s) {
+            return s.set();
         }
-        return (Set<String>) data;
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SET, got " + getType());
     }
 
     /**
      * Get value as Hash (Map). Throws if type mismatch.
      */
     @SuppressWarnings("unchecked")
-    public Map<String, String> asHash() {
-        if (type != Type.HASH) {
-            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + type);
+    default Map<String, String> asHash() {
+        if (this instanceof HashValue h) {
+            return h.hash();
         }
-        return (Map<String, String>) data;
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected HASH, got " + getType());
     }
 
     /**
      * Check if this value is of the specified type.
      */
-    public boolean isType(Type expectedType) {
-        return this.type == expectedType;
+    default boolean isType(Type expectedType) {
+        return getType() == expectedType;
     }
 
-    @Override
-    public String toString() {
-        return "RedisValue{type=" + type + ", data=" + data + "}";
+    // ==================== Implementation Records ====================
+
+    record StringValue(String value) implements RedisValue {
+        @Override public Type getType() { return Type.STRING; }
+        @Override public Object getData() { return value; }
+        @Override public String toString() { return "RedisValue{type=STRING, data=" + value + "}"; }
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        RedisValue that = (RedisValue) o;
-        return type == that.type && java.util.Objects.equals(data, that.data);
+    record ListValue(List<String> list) implements RedisValue {
+        @Override public Type getType() { return Type.LIST; }
+        @Override public Object getData() { return list; }
+        @Override public String toString() { return "RedisValue{type=LIST, data=" + list + "}"; }
     }
 
-    @Override
-    public int hashCode() {
-        return java.util.Objects.hash(type, data);
+    record SetValue(Set<String> set) implements RedisValue {
+        @Override public Type getType() { return Type.SET; }
+        @Override public Object getData() { return set; }
+        @Override public String toString() { return "RedisValue{type=SET, data=" + set + "}"; }
+    }
+
+    record HashValue(Map<String, String> hash) implements RedisValue {
+        @Override public Type getType() { return Type.HASH; }
+        @Override public Object getData() { return hash; }
+        @Override public String toString() { return "RedisValue{type=HASH, data=" + hash + "}"; }
     }
 }
