@@ -30,6 +30,7 @@ Detailed documentation for each command can be found in the [docs/commands](./do
 | `ECHO` | `ECHO message` | [ECHO.md](./docs/commands/ECHO.md) |
 | `EXPIRE` | `EXPIRE key seconds` | [EXPIRE.md](./docs/commands/EXPIRE.md) |
 | `TTL` | `TTL key` | [TTL.md](./docs/commands/TTL.md) |
+| `TYPE` | `TYPE key` | [TYPE.md](./docs/commands/TYPE.md) |
 
 ### 📝 Key-Value Operations
 | Command | Usage | Documentation |

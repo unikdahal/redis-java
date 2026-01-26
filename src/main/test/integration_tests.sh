@@ -291,6 +291,19 @@ send_cmd "DEL listkey2" > /dev/null
 send_cmd "RPUSH listkey2 val" > /dev/null
 run_test_contains "BLPOP-skipwrongtype" "BLPOP strkey2 listkey2 0" "listkey2" "val"
 
+# ==================== TYPE Tests (5) ====================
+echo ""
+echo "--- TYPE Tests ---"
+send_cmd "DEL type_str type_list type_none" > /dev/null
+send_cmd "SET type_str hello" > /dev/null
+send_cmd "RPUSH type_list world" > /dev/null
+run_test "TYPE-string" "TYPE type_str" "+string"
+run_test "TYPE-list" "TYPE type_list" "+list"
+run_test "TYPE-none" "TYPE type_none" "+none"
+send_cmd "DEL type_str type_list" > /dev/null
+run_test "TYPE-after-del" "TYPE type_str" "+none"
+run_test "TYPE-wrong-args" "TYPE k1 k2" "-ERR wrong number of arguments"
+
 # ==================== Combined Tests (100+) ====================
 echo ""
 echo "--- Combined Tests ---"
