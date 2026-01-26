@@ -3,6 +3,7 @@ com.redis.commands.generic.EchoCommand
 com.redis.commands.generic.ExpireCommand
 com.redis.commands.generic.PingCommand
 com.redis.commands.generic.TtlCommand
+com.redis.commands.generic.TypeCommand
 com.redis.commands.string.GetCommand
 com.redis.commands.string.SetCommand
 com.redis.commands.list.BLPopCommand
@@ -11,3 +12,6 @@ com.redis.commands.list.LPopCommand
 com.redis.commands.list.LPushCommand
 com.redis.commands.list.LRangeCommand
 com.redis.commands.list.RPushCommand
+com.redis.commands.stream.XAddCommand
+com.redis.commands.stream.XRangeCommand
+com.redis.commands.stream.XReadCommand

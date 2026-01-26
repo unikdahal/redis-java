@@ -30,6 +30,7 @@ Detailed documentation for each command can be found in the [docs/commands](./do
 | `ECHO` | `ECHO message` | [ECHO.md](./docs/commands/ECHO.md) |
 | `EXPIRE` | `EXPIRE key seconds` | [EXPIRE.md](./docs/commands/EXPIRE.md) |
 | `TTL` | `TTL key` | [TTL.md](./docs/commands/TTL.md) |
+| `TYPE` | `TYPE key` | [TYPE.md](./docs/commands/TYPE.md) |
 
 ### 📝 Key-Value Operations
 | Command | Usage | Documentation |
@@ -47,6 +48,13 @@ Detailed documentation for each command can be found in the [docs/commands](./do
 | `LLEN` | `LLEN key` | [LLEN.md](./docs/commands/LLEN.md) |
 | `LRANGE` | `LRANGE key start stop` | [LRANGE.md](./docs/commands/LRANGE.md) |
 | `BLPOP` | `BLPOP key [key ...] timeout` | [BLPOP.md](./docs/commands/BLPOP.md) |
+
+### 🌊 Stream Operations
+| Command | Usage | Documentation |
+|:---|:---|:---|
+| `XADD` | `XADD key ID field value [field v ...]` | [XADD.md](./docs/commands/XADD.md) |
+| `XRANGE` | `XRANGE key start end [COUNT c]` | [XRANGE.md](./docs/commands/XRANGE.md) |
+| `XREAD` | `XREAD [COUNT c] [BLOCK ms] STREAMS k [k ...] id [id ...]` | [XREAD.md](./docs/commands/XREAD.md) |
 
 ---
 

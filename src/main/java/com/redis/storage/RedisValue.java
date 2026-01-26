@@ -1,11 +1,14 @@
 package com.redis.storage;
 
+import com.redis.util.StreamId;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * Wrapper class for Redis values supporting multiple data types.
@@ -16,7 +19,8 @@ public sealed interface RedisValue permits
     RedisValue.ListValue, 
     RedisValue.SetValue, 
     RedisValue.HashValue,
-    RedisValue.SortedSetValue {
+    RedisValue.SortedSetValue,
+    RedisValue.StreamValue {
 
     /**
      * Redis data types.
@@ -26,7 +30,8 @@ public sealed interface RedisValue permits
         LIST,
         SET,
         HASH,
-        SORTED_SET
+        SORTED_SET,
+        STREAM
     }
 
     /**
@@ -74,6 +79,13 @@ public sealed interface RedisValue permits
      */
     static RedisValue sortedSet(Map<String, Double> value) {
         return new SortedSetValue(value);
+    }
+
+    /**
+     * Create a STREAM value.
+     */
+    static RedisValue stream(Map<StreamId, Map<String, String>> value) {
+        return new StreamValue(value);
     }
 
     // ==================== Type-Safe Accessors ====================
@@ -129,6 +141,16 @@ public sealed interface RedisValue permits
     }
 
     /**
+     * Get value as Stream (Map). Throws if type mismatch.
+     */
+    default Map<StreamId, Map<String, String>> asStream() {
+        if (this instanceof StreamValue(Map<StreamId, Map<String, String>> stream)) {
+            return stream;
+        }
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected STREAM, got " + getType());
+    }
+
+    /**
      * Check if this value is of the specified type.
      */
     default boolean isType(Type expectedType) {
@@ -179,5 +201,16 @@ public sealed interface RedisValue permits
         @Override public Type getType() { return Type.SORTED_SET; }
         @Override public Object getData() { return sortedSet; }
         @Override public String toString() { return "RedisValue{type=SORTED_SET, data=" + sortedSet + "}"; }
+    }
+
+    record StreamValue(Map<StreamId, Map<String, String>> stream) implements RedisValue {
+        public StreamValue {
+            if (!(stream instanceof ConcurrentSkipListMap)) {
+                stream = new ConcurrentSkipListMap<>(stream);
+            }
+        }
+        @Override public Type getType() { return Type.STREAM; }
+        @Override public Object getData() { return stream; }
+        @Override public String toString() { return "RedisValue{type=STREAM, data=" + stream + "}"; }
     }
 }
