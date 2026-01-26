@@ -8,7 +8,7 @@ TTL key
 ```
 
 #### Returns
-- **Integer**: TTL in seconds, `-1` if the key exists but has no associated expire, or `-2` if the key does not exist. (Note: Current implementation might return -1 if not found, I should check the code).
+- **Integer**: TTL in seconds, `-1` if the key exists but has no associated expire, or `-2` if the key does not exist or has already expired.
 
 #### Examples
 ```redis
