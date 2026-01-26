@@ -130,15 +130,19 @@ class LPushCommandTest {
     }
 
     @Test
-    void testLPush_UsesLinkedList() {
-        db.remove("linkedtest");
+    void testLPush_IsMutableAndThreadSafe() {
+        db.remove("mutabletest");
 
-        command.execute(List.of("linkedtest", "element"), ctx);
+        command.execute(List.of("mutabletest", "element"), ctx);
 
-        RedisValue value = db.getValue("linkedtest");
-        assertInstanceOf(LinkedList.class, value.getData());
+        RedisValue value = db.getValue("mutabletest");
+        List<String> list = value.asList();
+        
+        // Should be mutable
+        assertDoesNotThrow(() -> list.add("new element"));
+        assertEquals(2, list.size());
 
-        db.remove("linkedtest");
+        db.remove("mutabletest");
     }
 
     @Test
