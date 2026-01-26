@@ -73,8 +73,11 @@ public class ExpiryManager {
     }
 
     /**
-     * Gracefully shutdown the expiry manager.
-     * Fast and non-blocking termination.
+     * Stops the expiry manager and attempts to stop its background cleaner thread.
+     *
+     * Sets the internal running flag to false, interrupts the cleaner thread if it is alive,
+     * and waits up to one second for the thread to terminate. If the current thread is
+     * interrupted while waiting, this method restores the interrupt status.
      */
     public void shutdown() {
         running = false;
@@ -88,6 +91,20 @@ public class ExpiryManager {
         }
     }
 
+    /**
+     * Cancels any scheduled expiration for the specified key.
+     *
+     * @param key the key whose pending expiry (if any) will be removed
+     */
+    public void clearExpiry(String key) {
+        keyExpiryMap.remove(key);
+    }
+
+    /**
+     * Get the number of expiry tasks currently scheduled in the expiry queue.
+     *
+     * @return the number of scheduled expiry tasks; may include superseded or duplicate tasks pending processing
+     */
     public int getPendingExpiryCount() {
         return expiryQueue.size();
     }

@@ -1,81 +1,37 @@
-Add necessary git ignore rules for Java Spring Boot project
-
-# Compiled class files
+# Java
 *.class
-# Log files
 *.log
-# Temporary files
 *.tmp
-# IDE specific files
-/.idea/
+*.jar
+*.war
+*.ear
+
+# Maven
+target/
+build/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE - IntelliJ IDEA
+.idea/
 *.iml
+*.iws
+*.ipr
+out/
+
+# IDE - VS Code
 .vscode/
-# Maven target directory
-/target/
-# Gradle build directory
-/build/
-# Spring Boot specific files
-spring-boot-devtools.properties
-# OS generated files
+
+# OS
 .DS_Store
 Thumbs.db
-# Environment variable files
-.env
-# Dependency directories
-/node_modules/
 
-# Coverage reports
-/coverage/
-# Generated files
-/generated/
-# Application properties
-/application-*.properties
-/application-*.yml
-# Docker files
-/docker-compose.override.yml
-/docker-compose.dev.yml
-# Test output
-/test-output/
-# Eclipse specific files
-/.classpath
-/.project
-/.settings/
-# NetBeans specific files
-/nbproject/private/
-/nbbuild/
-/nbdist/
-/nbactions.xml
-/nb-configuration.xml
-# IntelliJ specific files
-/out/
-# Logs
-/logs/
-# Temporary files
-/tmp/
-# Backup files
-*~
-
-# Spring Boot executable jar
-/*.jar
-/*.war
-# Spring Boot launch scripts
-/*.bat
-/*.sh
-# Spring Boot build info
-/build-info.properties
-# Spring Boot cache
-/.spring-boot-devtools/
-
-# Miscellaneous
-/.DS_Store
-*.swp
-# Thumbnails
-._*
-# Files created by package managers
-yarn-error.log
-pnpm-debug.log
-lerna-debug.log
-ehthumbs.db
-Desktop.ini
-# Linux
-# Logs
+# Temporary / Session files
+.output.txt

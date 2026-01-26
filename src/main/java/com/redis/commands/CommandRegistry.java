@@ -20,9 +20,11 @@ public class CommandRegistry {
     private final Map<String, ICommand> registry = new ConcurrentHashMap<>(16);
 
     /**
-     * Initializes the singleton CommandRegistry and registers the built-in commands.
+     * Initialize the singleton registry and register the built-in Redis command implementations.
      *
-     * Registers the default command implementations: SetCommand, GetCommand, DelCommand, and RPushCommand.
+     * Registers the default commands: SetCommand, GetCommand, DelCommand, RPushCommand,
+     * LRangeCommand, LPushCommand, PingCommand, EchoCommand, LLenCommand, LPopCommand,
+     * BLPopCommand, ExpireCommand, and TtlCommand.
      */
     private CommandRegistry() {
         // Register built-in commands
@@ -32,6 +34,13 @@ public class CommandRegistry {
         register(new RPushCommand());
         register(new LRangeCommand());
         register(new LPushCommand());
+        register(new PingCommand());
+        register(new EchoCommand());
+        register(new LLenCommand());
+        register(new LPopCommand());
+        register(new BLPopCommand());
+        register(new ExpireCommand());
+        register(new TtlCommand());
     }
 
     /**

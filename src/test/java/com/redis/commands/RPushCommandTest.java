@@ -56,7 +56,7 @@ class RPushCommandTest {
         assertNotNull(value);
         assertEquals(RedisValue.Type.LIST, value.getType());
         assertEquals(1, value.asList().size());
-        assertEquals("value1", value.asList().getFirst());
+        assertEquals("value1", value.asList().get(0));
 
         db.remove("testlist1");
     }
