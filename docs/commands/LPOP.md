@@ -3,7 +3,7 @@
 Removes and returns the first elements of the list stored at key.
 
 #### Syntax
-```
+```redis
 LPOP key [count]
 ```
 
@@ -12,7 +12,7 @@ LPOP key [count]
 - **Array**: list of popped elements when the count argument is given.
 
 #### Examples
-```
+```redis
 > RPUSH mylist "one" "two" "three"
 (integer) 3
 > LPOP mylist

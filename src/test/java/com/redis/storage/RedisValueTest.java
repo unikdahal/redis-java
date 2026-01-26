@@ -54,12 +54,23 @@ class RedisValueTest {
     }
 
     @Test
+    void testSortedSetValue() {
+        Map<String, Double> sortedSet = Map.of("member1", 1.0, "member2", 2.5);
+        RedisValue value = RedisValue.sortedSet(sortedSet);
+
+        assertEquals(RedisValue.Type.SORTED_SET, value.getType());
+        assertEquals(sortedSet, value.asSortedSet());
+        assertTrue(value.isType(RedisValue.Type.SORTED_SET));
+    }
+
+    @Test
     void testWrongTypeAccessThrows() {
         RedisValue stringValue = RedisValue.string("test");
 
         assertThrows(IllegalStateException.class, stringValue::asList);
         assertThrows(IllegalStateException.class, stringValue::asSet);
         assertThrows(IllegalStateException.class, stringValue::asHash);
+        assertThrows(IllegalStateException.class, stringValue::asSortedSet);
     }
 
     @Test

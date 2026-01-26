@@ -3,7 +3,7 @@
 Insert all the specified values at the head of the list stored at key. If key does not exist, it is created as empty list before performing the push operations. When key holds a value that is not a list, an error is returned.
 
 #### Syntax
-```
+```redis
 LPUSH key element [element ...]
 ```
 
@@ -11,7 +11,7 @@ LPUSH key element [element ...]
 - **Integer**: the length of the list after the push operations.
 
 #### Examples
-```
+```redis
 > LPUSH mylist "world"
 (integer) 1
 > LPUSH mylist "hello"

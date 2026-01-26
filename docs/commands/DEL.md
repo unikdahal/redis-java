@@ -3,7 +3,7 @@
 Removes the specified keys. A key is ignored if it does not exist.
 
 #### Syntax
-```
+```redis
 DEL key [key ...]
 ```
 
@@ -11,7 +11,7 @@ DEL key [key ...]
 - **Integer**: The number of keys that were removed.
 
 #### Examples
-```
+```redis
 > SET key1 "Hello"
 "OK"
 > SET key2 "World"

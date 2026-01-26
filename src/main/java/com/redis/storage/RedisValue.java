@@ -12,7 +12,8 @@ public sealed interface RedisValue permits
     RedisValue.StringValue, 
     RedisValue.ListValue, 
     RedisValue.SetValue, 
-    RedisValue.HashValue {
+    RedisValue.HashValue,
+    RedisValue.SortedSetValue {
 
     /**
      * Redis data types.
@@ -65,6 +66,13 @@ public sealed interface RedisValue permits
         return new HashValue(value);
     }
 
+    /**
+     * Create a SORTED_SET value.
+     */
+    static RedisValue sortedSet(Map<String, Double> value) {
+        return new SortedSetValue(value);
+    }
+
     // ==================== Type-Safe Accessors ====================
 
     /**
@@ -108,6 +116,16 @@ public sealed interface RedisValue permits
     }
 
     /**
+     * Get value as Sorted Set (Map). Throws if type mismatch.
+     */
+    default Map<String, Double> asSortedSet() {
+        if (this instanceof SortedSetValue(Map<String, Double> sortedSet)) {
+            return sortedSet;
+        }
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value. Expected SORTED_SET, got " + getType());
+    }
+
+    /**
      * Check if this value is of the specified type.
      */
     default boolean isType(Type expectedType) {
@@ -138,5 +156,11 @@ public sealed interface RedisValue permits
         @Override public Type getType() { return Type.HASH; }
         @Override public Object getData() { return hash; }
         @Override public String toString() { return "RedisValue{type=HASH, data=" + hash + "}"; }
+    }
+
+    record SortedSetValue(Map<String, Double> sortedSet) implements RedisValue {
+        @Override public Type getType() { return Type.SORTED_SET; }
+        @Override public Object getData() { return sortedSet; }
+        @Override public String toString() { return "RedisValue{type=SORTED_SET, data=" + sortedSet + "}"; }
     }
 }

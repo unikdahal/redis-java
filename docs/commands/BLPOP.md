@@ -3,7 +3,7 @@
 BLPOP is a blocking list pop primitive. It is the blocking version of LPOP because it blocks the connection when there are no elements to pop from any of the given lists. An element is popped from the head of the first list that is non-empty, with the given keys being checked in the order that they are given.
 
 #### Syntax
-```
+```redis
 BLPOP key [key ...] timeout
 ```
 
@@ -12,7 +12,7 @@ BLPOP key [key ...] timeout
 - **Null Bulk String**: when no element could be popped and the timeout expired.
 
 #### Examples
-```
+```redis
 > DEL list1 list2
 (integer) 0
 > RPUSH list1 a b c
