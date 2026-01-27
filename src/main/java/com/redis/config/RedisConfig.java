@@ -6,11 +6,11 @@ import java.util.Properties;
 
 /**
  * Central configuration for the Redis server.
- * Loads defaults and can be overridden by application.properties or environment variables.
+ * Loads default and can be overridden by application.properties or environment variables.
  */
 public class RedisConfig {
     private static RedisConfig instance;
-    private Properties properties = new Properties();
+    private final Properties properties = new Properties();
 
     // Default configuration values
     private static final int DEFAULT_PORT = 6379;
