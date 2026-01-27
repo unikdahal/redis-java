@@ -134,7 +134,7 @@ public class XReadCommand implements ICommand {
                 try {
                     lastId = StreamId.parse(idArg);
                 } catch (IllegalArgumentException e) {
-                    continue; // Skip invalid IDs
+                    return "-ERR Invalid stream ID specified as stream command argument\r\n";
                 }
             }
 
