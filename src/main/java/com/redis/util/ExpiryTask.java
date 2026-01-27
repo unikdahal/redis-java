@@ -7,22 +7,7 @@ import java.util.concurrent.TimeUnit;
  * A Delayed task representing a key expiration scheduled for a specific time.
  * Used by ExpiryManager to efficiently schedule and execute expiry cleanups.
  */
-public class ExpiryTask implements Delayed {
-    private final String key;
-    private final long expiryTimeMillis;
-
-    public ExpiryTask(String key, long expiryTimeMillis) {
-        this.key = key;
-        this.expiryTimeMillis = expiryTimeMillis;
-    }
-
-    public String getKey() {
-        return key;
-    }
-
-    public long getExpiryTimeMillis() {
-        return expiryTimeMillis;
-    }
+public record ExpiryTask(String key, long expiryTimeMillis) implements Delayed {
 
     @Override
     public long getDelay(TimeUnit unit) {
@@ -39,10 +24,6 @@ public class ExpiryTask implements Delayed {
 
     @Override
     public String toString() {
-        return "ExpiryTask{" +
-                "key='" + key + '\'' +
-                ", expiryTimeMillis=" + expiryTimeMillis +
-                ", delayMs=" + getDelay(TimeUnit.MILLISECONDS) +
-                '}';
+        return "ExpiryTask{" + "key='" + key + '\'' + ", expiryTimeMillis=" + expiryTimeMillis + ", delayMs=" + getDelay(TimeUnit.MILLISECONDS) + '}';
     }
 }
