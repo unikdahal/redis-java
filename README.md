@@ -14,6 +14,7 @@ A high-performance, lightweight, in-memory Redis-compatible server built from th
 - **💾 In-Memory Storage**: Optimized data structures using `ConcurrentHashMap` for thread-safe, lock-free reads.
 - **🔌 Redis Protocol (RESP)**: Implements the Redis Serialization Protocol, compatible with any standard Redis client (`redis-cli`, `jedis`, `redis-py`, etc.).
 - **⏳ Advanced Expiration**: Dual-strategy expiration (Lazy + Active background cleanup via `DelayQueue`).
+- **🔄 Transaction Support**: Full MULTI/EXEC/DISCARD support with optimized batch execution and zero-contention state management.
 - **🎯 Single-Threaded Execution**: Primarily single-threaded command execution for predictable behavior; blocking commands (e.g., `BLPOP`) are handled asynchronously using Netty's event loop to avoid blocking I/O.
 - **🏗️ Extensible Command Registry**: Easy to add new commands via a simple interface.
 
@@ -38,6 +39,14 @@ Detailed documentation for each command can be found in the [docs/commands](./do
 | `SET` | `SET key value [EX s] [PX ms] [NX\|XX]` | [SET.md](./docs/commands/SET.md) |
 | `GET` | `GET key` | [GET.md](./docs/commands/GET.md) |
 | `DEL` | `DEL key [key ...]` | [DEL.md](./docs/commands/DEL.md) |
+| `INCR` | `INCR key` | [INCR.md](./docs/commands/INCR.md) |
+
+### 🔄 Transactions
+| Command | Usage | Documentation |
+|:---|:---|:---|
+| `MULTI` | `MULTI` | [MULTI.md](./docs/commands/MULTI.md) |
+| `EXEC` | `EXEC` | [EXEC.md](./docs/commands/EXEC.md) |
+| `DISCARD` | `DISCARD` | [DISCARD.md](./docs/commands/DISCARD.md) |
 
 ### 📋 List Operations
 | Command | Usage | Documentation |
@@ -119,7 +128,22 @@ We maintain high confidence through both unit and integration tests.
 
 # Run only unit tests
 mvn test
+
+# Run only integration tests
+mvn verify -DskipUnitTests
 ```
+
+---
+
+## 🔒 CI/CD & Branch Protection
+
+This repository enforces **mandatory passing tests** before any PR can be merged:
+
+- ✅ **Build** must compile successfully
+- ✅ **Unit Tests** must all pass (469+ tests)
+- ✅ **Integration Tests** must all pass (179+ tests)
+
+The CI pipeline runs automatically on every push and PR. See [Branch Protection Setup](./docs/BRANCH_PROTECTION.md) for configuration details.
 
 ---
 
