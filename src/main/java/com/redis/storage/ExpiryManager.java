@@ -54,8 +54,8 @@ public class ExpiryManager {
 
                 if (!running) break; // Fast shutdown check
 
-                String key = task.getKey();
-                long expectedExpiryTime = task.getExpiryTimeMillis();
+                String key = task.key();
+                long expectedExpiryTime = task.expiryTimeMillis();
 
                 // Deduplication: only process if this is still the latest expiry for this key
                 Long currentExpiry = keyExpiryMap.get(key);
