@@ -212,4 +212,118 @@ public class IncrCommandTest {
     void testCommandName() {
         assertEquals("INCR", command.name());
     }
+
+    @Test
+    @DisplayName("INCR: Increment very large negative number approaching zero")
+    void testIncrLargeNegativeApproachingZero() {
+        db.put("incr_test_large_neg", String.valueOf(Long.MIN_VALUE + 1));
+
+        List<String> args = Collections.singletonList("incr_test_large_neg");
+        String result = command.execute(args, mockCtx);
+
+        assertEquals(":" + (Long.MIN_VALUE + 2) + "\r\n", result);
+        assertEquals(String.valueOf(Long.MIN_VALUE + 2), db.get("incr_test_large_neg"));
+    }
+
+    @Test
+    @DisplayName("INCR: Increment at boundary (Long.MAX_VALUE - 1)")
+    void testIncrNearMaxValue() {
+        db.put("incr_test_near_max", String.valueOf(Long.MAX_VALUE - 1));
+
+        List<String> args = Collections.singletonList("incr_test_near_max");
+        String result = command.execute(args, mockCtx);
+
+        assertEquals(":" + Long.MAX_VALUE + "\r\n", result);
+        assertEquals(String.valueOf(Long.MAX_VALUE), db.get("incr_test_near_max"));
+    }
+
+    @Test
+    @DisplayName("INCR: Leading zeros are parsed correctly")
+    void testIncrWithLeadingZeros() {
+        db.put("incr_test_leading_zeros", "0000042");
+
+        List<String> args = Collections.singletonList("incr_test_leading_zeros");
+        String result = command.execute(args, mockCtx);
+
+        assertEquals(":43\r\n", result);
+        assertEquals("43", db.get("incr_test_leading_zeros"));
+    }
+
+    @Test
+    @DisplayName("INCR: String with whitespace is invalid")
+    void testIncrStringWithWhitespace() {
+        db.put("incr_test_whitespace", " 42 ");
+
+        List<String> args = Collections.singletonList("incr_test_whitespace");
+        String result = command.execute(args, mockCtx);
+
+        assertTrue(result.contains("ERR"));
+        assertTrue(result.contains("not an integer"));
+        assertEquals(" 42 ", db.get("incr_test_whitespace"));
+    }
+
+    @Test
+    @DisplayName("INCR: Empty string is invalid")
+    void testIncrEmptyString() {
+        db.put("incr_test_empty", "");
+
+        List<String> args = Collections.singletonList("incr_test_empty");
+        String result = command.execute(args, mockCtx);
+
+        assertTrue(result.contains("ERR"));
+        assertEquals("", db.get("incr_test_empty"));
+    }
+
+    @Test
+    @DisplayName("INCR: Scientific notation is invalid")
+    void testIncrScientificNotation() {
+        db.put("incr_test_scientific", "1e5");
+
+        List<String> args = Collections.singletonList("incr_test_scientific");
+        String result = command.execute(args, mockCtx);
+
+        assertTrue(result.contains("ERR"));
+        assertEquals("1e5", db.get("incr_test_scientific"));
+    }
+
+    @Test
+    @DisplayName("INCR: Underflow at Long.MIN_VALUE")
+    void testIncrUnderflow() {
+        db.put("incr_test_underflow", String.valueOf(Long.MIN_VALUE));
+
+        List<String> args = Collections.singletonList("incr_test_underflow");
+        String result = command.execute(args, mockCtx);
+
+        // Should succeed: MIN_VALUE + 1 is valid
+        assertEquals(":" + (Long.MIN_VALUE + 1) + "\r\n", result);
+        assertEquals(String.valueOf(Long.MIN_VALUE + 1), db.get("incr_test_underflow"));
+    }
+
+    @Test
+    @DisplayName("INCR: Concurrent-like behavior with multiple increments")
+    void testIncrConcurrentLike() {
+        db.put("incr_test_concurrent", "100");
+        List<String> args = Collections.singletonList("incr_test_concurrent");
+
+        // Simulate rapid increments
+        for (int i = 0; i < 10; i++) {
+            String result = command.execute(args, mockCtx);
+            int expectedValue = 101 + i;
+            assertEquals(":" + expectedValue + "\r\n", result);
+        }
+
+        assertEquals("110", db.get("incr_test_concurrent"));
+    }
+
+    @Test
+    @DisplayName("INCR: Plus sign prefix is invalid")
+    void testIncrPlusSignPrefix() {
+        db.put("incr_test_plus", "+42");
+
+        List<String> args = Collections.singletonList("incr_test_plus");
+        String result = command.execute(args, mockCtx);
+
+        assertTrue(result.contains("ERR"));
+        assertEquals("+42", db.get("incr_test_plus"));
+    }
 }
