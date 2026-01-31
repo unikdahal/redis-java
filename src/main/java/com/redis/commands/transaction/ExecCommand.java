@@ -44,6 +44,11 @@ public class ExecCommand implements ICommand {
 
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
+
+        if(!args.isEmpty()) {
+            return "-ERR wrong number of arguments for 'EXEC' command\r\n";
+        }
+
         // Get transaction context
         TransactionContext txCtx = TransactionContext.get(ctx.channel());
 

@@ -98,7 +98,7 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
             // COMMAND RESOLUTION:
             // The first element of the array is always the command name (e.g., "SET", "GET").
             String commandName = argsBuffer.getFirst();
-            String upperCommandName = commandName.toUpperCase();
+            String upperCommandName = commandName != null ? commandName.toUpperCase() : "";
             ICommand cmd = CommandRegistry.getInstance().get(commandName);
 
             if (cmd == null) {
