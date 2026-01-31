@@ -128,7 +128,22 @@ We maintain high confidence through both unit and integration tests.
 
 # Run only unit tests
 mvn test
+
+# Run only integration tests
+mvn verify -DskipUnitTests
 ```
+
+---
+
+## 🔒 CI/CD & Branch Protection
+
+This repository enforces **mandatory passing tests** before any PR can be merged:
+
+- ✅ **Build** must compile successfully
+- ✅ **Unit Tests** must all pass (469+ tests)
+- ✅ **Integration Tests** must all pass (179+ tests)
+
+The CI pipeline runs automatically on every push and PR. See [Branch Protection Setup](./docs/BRANCH_PROTECTION.md) for configuration details.
 
 ---
 

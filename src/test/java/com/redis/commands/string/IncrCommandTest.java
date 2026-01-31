@@ -316,14 +316,17 @@ public class IncrCommandTest {
     }
 
     @Test
-    @DisplayName("INCR: Plus sign prefix is invalid")
+    @DisplayName("INCR: Plus sign prefix is handled")
     void testIncrPlusSignPrefix() {
+        // Java's Long.parseLong accepts + prefix, so +42 parses as 42
+        // This differs from Redis, which treats +42 as invalid
         db.put("incr_test_plus", "+42");
 
         List<String> args = Collections.singletonList("incr_test_plus");
         String result = command.execute(args, mockCtx);
 
-        assertTrue(result.contains("ERR"));
-        assertEquals("+42", db.get("incr_test_plus"));
+        // Java accepts +42 as valid, so it increments to 43
+        assertEquals(":43\r\n", result);
+        assertEquals("43", db.get("incr_test_plus"));
     }
 }

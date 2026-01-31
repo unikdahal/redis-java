@@ -172,14 +172,14 @@ public class ExecCommandTest {
     }
 
     @Test
-    @DisplayName("EXEC: Ignores arguments")
-    void testExecIgnoresArguments() {
+    @DisplayName("EXEC: Rejects extra arguments")
+    void testExecRejectsArguments() {
         TransactionContext ctx = TransactionContext.getOrCreate(channel);
         ctx.startTransaction();
 
         String result = command.execute(Collections.singletonList("extra"), mockCtx);
 
-        assertEquals("*0\r\n", result);
+        assertTrue(result.startsWith("-ERR"), "EXEC should reject extra arguments");
     }
 
     @Test
