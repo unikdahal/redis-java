@@ -2,6 +2,7 @@ package com.redis.server;
 
 import com.redis.commands.CommandRegistry;
 import com.redis.commands.ICommand;
+import com.redis.transaction.TransactionContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -10,6 +11,7 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Netty channel handler responsible for the "Framing" phase of the Redis protocol.
@@ -31,6 +33,17 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
 
     // Initial capacity for the arguments list. Most Redis commands have fewer than 16 arguments.
     private static final int INITIAL_ARGS_CAPACITY = 16;
+
+    /**
+     * Commands that are allowed to execute immediately even within a transaction.
+     * These are the transaction control commands themselves.
+     */
+    private static final Set<String> TRANSACTION_COMMANDS = Set.of("EXEC", "DISCARD", "MULTI");
+
+    /**
+     * RESP response for successfully queued commands in a transaction.
+     */
+    private static final String RESP_QUEUED = "+QUEUED\r\n";
 
     /**
      * A reusable buffer for command arguments.
@@ -84,25 +97,40 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
 
             // COMMAND RESOLUTION:
             // The first element of the array is always the command name (e.g., "SET", "GET").
-            String commandName = argsBuffer.get(0);
+            String commandName = argsBuffer.getFirst();
+            String upperCommandName = commandName.toUpperCase();
             ICommand cmd = CommandRegistry.getInstance().get(commandName);
 
             if (cmd == null) {
-                // Protocol requires reporting unknown commands to the client
+                // Protocol requires reporting unknown commands to the client,
+                // But if in transaction, we still need to track the error
+                TransactionContext txCtx = TransactionContext.get(ctx.channel());
+                if (txCtx != null && txCtx.isInTransaction()) {
+                    txCtx.markError();
+                }
                 writeResponse(ctx, "-ERR unknown command '" + commandName + "'\r\n");
             } else {
                 // Create a view of the arguments (skipping the command name).
                 // subList is a lightweight view, not a copy.
                 List<String> commandArgs = argsBuffer.size() > 1 ? argsBuffer.subList(1, argsBuffer.size()) : List.of();
 
-                // EXECUTION:
-                // Run the actual logic (e.g., modifying the KeyValue store).
-                String resp = cmd.execute(commandArgs, ctx);
+                // TRANSACTION HANDLING:
+                // Check if we're in a transaction and this isn't a transaction control command
+                TransactionContext txCtx = TransactionContext.get(ctx.channel());
+                if (txCtx != null && txCtx.isInTransaction() && !TRANSACTION_COMMANDS.contains(upperCommandName)) {
+                    // Queue the command instead of executing it
+                    txCtx.queueCommand(cmd, commandArgs);
+                    writeResponse(ctx, RESP_QUEUED);
+                } else {
+                    // EXECUTION:
+                    // Run the actual logic (e.g., modifying the KeyValue store).
+                    String resp = cmd.execute(commandArgs, ctx);
 
-                // If response is not null, write it immediately.
-                // Null responses implies the command handles its own writing asynchronously (e.g., blocking ops).
-                if (resp != null) {
-                    writeResponse(ctx, resp);
+                    // If response is not null, write it immediately.
+                    // Null responses implies the command handles its own writing asynchronously (e.g., blocking ops).
+                    if (resp != null) {
+                        writeResponse(ctx, resp);
+                    }
                 }
             }
         }
