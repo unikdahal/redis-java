@@ -273,7 +273,7 @@ public class MasterConnection {
                 // Special handling for RDB data - do NOT mark/reset here
                 // as RDB bytes are consumed progressively by handleRdbData
                 if (loadingRdb) {
-                    if (!handleRdbData(in)) {
+                    if (!handleRdbData(ctx, in)) {
                         // Not enough data yet, wait for more
                         return;
                     }
@@ -282,12 +282,21 @@ public class MasterConnection {
 
                 // Mark before RESP parsing - only reset if RESP parse is incomplete
                 in.markReaderIndex();
+                int startReaderIndex = in.readerIndex();
 
                 // Parse RESP response
                 argsBuffer.clear();
                 if (!parseRespResponse(in, argsBuffer)) {
                     in.resetReaderIndex();
                     return;
+                }
+
+                // Calculate bytes consumed by this RESP message for accurate REPLCONF ACK
+                int bytesConsumed = in.readerIndex() - startReaderIndex;
+
+                // Only track bytes during streaming mode (not during handshake)
+                if (handshakeState == HandshakeState.STREAMING) {
+                    bytesProcessed.addAndGet(bytesConsumed);
                 }
 
                 // Route response based on current handshake state
@@ -461,7 +470,15 @@ public class MasterConnection {
                 String[] parts = response.split(" ");
                 if (parts.length >= 3) {
                     String replId = parts[1];
-                    long offset = Long.parseLong(parts[2]);
+                    long offset;
+                    try {
+                        offset = Long.parseLong(parts[2]);
+                    } catch (NumberFormatException e) {
+                        System.err.println("[Replication] Malformed FULLRESYNC offset: '" + parts[2] +
+                            "' in response: " + response);
+                        // Do not change state - bail out without disrupting the pipeline
+                        return;
+                    }
                     System.out.println("[Replication] Full resync: replId=" + replId + ", offset=" + offset);
 
                     ReplicationManager.getInstance().setMasterReplOffset(offset);
@@ -481,19 +498,27 @@ public class MasterConnection {
         /**
          * Handles incoming RDB file data.
          *
+         * @param ctx Channel context for error handling
          * @param in Input buffer
          * @return true if RDB is complete, false if more data needed
          */
-        private boolean handleRdbData(ByteBuf in) {
+        private boolean handleRdbData(ChannelHandlerContext ctx, ByteBuf in) {
             // First, read the RDB size if not yet known
             if (expectedRdbSize == -1) {
                 if (in.readableBytes() < 1) return false;
 
-                byte marker = in.readByte();
+                // Peek at marker without consuming
+                byte marker = in.getByte(in.readerIndex());
                 if (marker != '$') {
-                    System.err.println("[Replication] Expected RDB size marker, got: " + (char) marker);
+                    System.err.println("[Replication] Protocol error: Expected RDB size marker '$', got: " +
+                        (char) marker + " (0x" + Integer.toHexString(marker & 0xFF) + ")");
+                    // Cleanup RDB state and close connection
+                    cleanupRdbState();
+                    ctx.close();
                     return false;
                 }
+                // Now consume the marker
+                in.readByte();
 
                 int start = in.readerIndex();
                 int end = in.indexOf(start, in.writerIndex(), (byte) '\r');
@@ -912,6 +937,7 @@ public class MasterConnection {
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             System.err.println("[Replication] Master connection error: " + cause.getMessage());
             cause.printStackTrace();
+            cleanupRdbState();
             ctx.close();
             connected = false;
         }
@@ -919,7 +945,23 @@ public class MasterConnection {
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
             System.out.println("[Replication] Master connection closed");
+            cleanupRdbState();
             connected = false;
+        }
+
+        /**
+         * Cleans up RDB loading state and releases any allocated buffers.
+         * Must be called on connection teardown to prevent ByteBuf leaks.
+         */
+        private void cleanupRdbState() {
+            if (loadingRdb) {
+                loadingRdb = false;
+                expectedRdbSize = -1;
+                if (rdbBuffer != null) {
+                    rdbBuffer.release();
+                    rdbBuffer = null;
+                }
+            }
         }
     }
 

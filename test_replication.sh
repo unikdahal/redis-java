@@ -277,17 +277,29 @@ test_stream_replication() {
 }
 
 # Stress test
+# NOTE: If you need higher concurrency, increase ulimit -n (file descriptors)
+# Usage: STRESS_CONCURRENCY=50 ./test_replication.sh --stress
 stress_test() {
     log_section "Stress Test: High Throughput"
 
     local count=10000
-    log_info "Writing $count keys to master..."
+    # Limit concurrency to avoid exhausting file descriptors/ports
+    # Can be overridden via environment variable
+    local concurrency=${STRESS_CONCURRENCY:-10}
+
+    log_info "Writing $count keys to master (concurrency=$concurrency)..."
+    log_info "Tip: Increase STRESS_CONCURRENCY or ulimit -n for higher throughput"
 
     local start=$(date +%s%N)
+    local running=0
     for i in $(seq 1 $count); do
         send_command $MASTER_PORT SET "stress$i" "v$i" > /dev/null &
-        if [ $((i % 100)) -eq 0 ]; then
+        running=$((running + 1))
+
+        # Wait when we hit concurrency limit
+        if [ $running -ge $concurrency ]; then
             wait
+            running=0
         fi
     done
     wait

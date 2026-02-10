@@ -630,6 +630,17 @@ public class ReplicationManager {
 
     public void shutdown() {
         shuttingDown = true;
+
+        // Close master connection if we're a replica
+        if (masterConnection != null) {
+            try {
+                masterConnection.disconnect();
+            } catch (Exception e) {
+                System.err.println("[Replication] Error closing master connection: " + e.getMessage());
+            }
+            masterConnection = null;
+        }
+
         // Close all replica connections gracefully
         for (ReplicaConnection replica : replicas.values()) {
             replica.close();

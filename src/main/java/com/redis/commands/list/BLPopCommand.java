@@ -266,4 +266,50 @@ public class BLPopCommand implements ICommand {
     public String getReplicationCommandName() {
         return "LPOP";
     }
+
+    /**
+     * Extracts replication arguments from the BLPOP response.
+     * <p>
+     * BLPOP returns [key, element] on success. For replication, we need to
+     * convert this to LPOP args: just the key that was popped from.
+     * <p>
+     * This ensures replicas receive deterministic LPOP commands instead of
+     * non-deterministic BLPOP with timeout and multiple keys.
+     *
+     * @param originalArgs The original BLPOP arguments (keys + timeout)
+     * @param response The RESP response from execute() - expects [key, element] array format
+     * @return List containing just the key for LPOP, or null if response invalid
+     */
+    @Override
+    public List<String> getReplicationArgs(List<String> originalArgs, String response) {
+        if (response == null || response.equals(RESP_NIL)) {
+            // No data was popped, nothing to replicate
+            return null;
+        }
+
+        // Parse the RESP array response to extract the key
+        // Format: *2\r\n$keylen\r\nkey\r\n$elemlen\r\nelement\r\n
+        try {
+            if (!response.startsWith("*2\r\n")) {
+                return null;
+            }
+
+            // Find the first bulk string (the key)
+            int keyStart = response.indexOf('$', 4);
+            if (keyStart == -1) return null;
+
+            int keyLenEnd = response.indexOf("\r\n", keyStart);
+            if (keyLenEnd == -1) return null;
+
+            int keyLen = Integer.parseInt(response.substring(keyStart + 1, keyLenEnd));
+            int keyDataStart = keyLenEnd + 2;
+            String key = response.substring(keyDataStart, keyDataStart + keyLen);
+
+            // Return args for LPOP: just the key
+            return List.of(key);
+        } catch (Exception e) {
+            System.err.println("[BLPopCommand] Failed to parse response for replication: " + e.getMessage());
+            return null;
+        }
+    }
 }

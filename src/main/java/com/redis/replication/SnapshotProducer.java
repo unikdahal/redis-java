@@ -289,10 +289,18 @@ public class SnapshotProducer {
                         break;
 
                     case STREAM:
-                        // Streams are complex; simplified for now
+                        // Streams are complex; full serialization not yet implemented
+                        // Log warning for each skipped stream
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<?, ?> streamData = (java.util.Map<?, ?>) value.getData();
+                        int entryCount = streamData != null ? streamData.size() : 0;
+                        System.err.println("[SnapshotProducer] WARNING: Stream data being skipped for key '" +
+                            key + "' (RDB_TYPE_STREAM=" + RDB_TYPE_STREAM + ", entries=" + entryCount +
+                            "). Full stream serialization not implemented - replica will receive empty stream.");
+
                         out.write(RDB_TYPE_STREAM);
                         writeString(out, key);
-                        // Write empty stream marker
+                        // Write empty stream marker (entries will be lost)
                         writeLength(out, 0);
                         break;
 

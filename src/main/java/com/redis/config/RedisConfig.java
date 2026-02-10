@@ -115,7 +115,13 @@ public class RedisConfig {
                 System.err.println("[RedisConfig] Warning: Invalid REDIS_PORT value '" + envPort + "', using default");
             }
         }
-        return Integer.parseInt(properties.getProperty("redis.port", String.valueOf(DEFAULT_PORT)));
+        String propValue = properties.getProperty("redis.port", String.valueOf(DEFAULT_PORT));
+        try {
+            return Integer.parseInt(propValue);
+        } catch (NumberFormatException e) {
+            System.err.println("[RedisConfig] Warning: Invalid redis.port property value '" + propValue + "', using default");
+            return DEFAULT_PORT;
+        }
     }
 
     public int getBossThreads() {
@@ -127,7 +133,13 @@ public class RedisConfig {
                 System.err.println("[RedisConfig] Warning: Invalid REDIS_BOSS_THREADS value '" + envThreads + "', using default");
             }
         }
-        return Integer.parseInt(properties.getProperty("redis.boss.threads", String.valueOf(DEFAULT_BOSS_THREADS)));
+        String propValue = properties.getProperty("redis.boss.threads", String.valueOf(DEFAULT_BOSS_THREADS));
+        try {
+            return Integer.parseInt(propValue);
+        } catch (NumberFormatException e) {
+            System.err.println("[RedisConfig] Warning: Invalid redis.boss.threads property value '" + propValue + "', using default");
+            return DEFAULT_BOSS_THREADS;
+        }
     }
 
     public int getWorkerThreads() {
@@ -139,7 +151,13 @@ public class RedisConfig {
                 System.err.println("[RedisConfig] Warning: Invalid REDIS_WORKER_THREADS value '" + envThreads + "', using default");
             }
         }
-        return Integer.parseInt(properties.getProperty("redis.worker.threads", String.valueOf(DEFAULT_WORKER_THREADS)));
+        String propValue = properties.getProperty("redis.worker.threads", String.valueOf(DEFAULT_WORKER_THREADS));
+        try {
+            return Integer.parseInt(propValue);
+        } catch (NumberFormatException e) {
+            System.err.println("[RedisConfig] Warning: Invalid redis.worker.threads property value '" + propValue + "', using default");
+            return DEFAULT_WORKER_THREADS;
+        }
     }
 
     public int getCleanupIntervalMs() {
@@ -151,7 +169,13 @@ public class RedisConfig {
                 System.err.println("[RedisConfig] Warning: Invalid REDIS_CLEANUP_INTERVAL_MS value '" + envInterval + "', using default");
             }
         }
-        return Integer.parseInt(properties.getProperty("redis.cleanup.interval.ms", String.valueOf(DEFAULT_CLEANUP_INTERVAL_MS)));
+        String propValue = properties.getProperty("redis.cleanup.interval.ms", String.valueOf(DEFAULT_CLEANUP_INTERVAL_MS));
+        try {
+            return Integer.parseInt(propValue);
+        } catch (NumberFormatException e) {
+            System.err.println("[RedisConfig] Warning: Invalid redis.cleanup.interval.ms property value '" + propValue + "', using default");
+            return DEFAULT_CLEANUP_INTERVAL_MS;
+        }
     }
 
     public boolean isExpiryEnabled() {
