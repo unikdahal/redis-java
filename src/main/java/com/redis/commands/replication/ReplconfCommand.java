@@ -26,6 +26,16 @@ public class ReplconfCommand implements ICommand {
     private static final String ERR_WRONG_ARGS = "-ERR wrong number of arguments for 'REPLCONF' command\r\n";
     private static final String ERR_UNKNOWN_SUBCOMMAND = "-ERR Unknown REPLCONF subcommand\r\n";
 
+    /**
+     * Handles the REPLCONF command by dispatching to the appropriate subcommand handler.
+     *
+     * @param args the command arguments where args[0] is the REPLCONF subcommand
+     *             (e.g., "LISTENING-PORT", "CAPA", "ACK", "GETACK") and subsequent
+     *             entries are subcommand-specific parameters
+     * @param ctx  the channel handler context for the client connection
+     * @return a RESP-formatted response string to send to the client (e.g. "+OK\r\n" or an error),
+     *         or `null` when no response should be sent for the subcommand
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.isEmpty()) {
@@ -54,8 +64,17 @@ public class ReplconfCommand implements ICommand {
     }
 
     /**
-     * Handles REPLCONF listening-port from replica.
-     * Master uses this to know the replica's listening port.
+     * Process the REPLCONF LISTENING-PORT subcommand from a replica.
+     *
+     * Parses the replica's listening port from args, creates or updates the corresponding
+     * ReplicaConnection with that port, and transitions the replica to the HANDSHAKE state.
+     *
+     * @param args   command arguments where args.get(1) is the listening port
+     * @param ctx    channel handler context for the replica connection
+     * @param replMgr replication manager used to lookup or register the replica
+     * @return       {@code +OK\r\n} on success;
+     *               {@code -ERR wrong number of arguments for 'REPLCONF' command\r\n} if args are insufficient;
+     *               {@code -ERR invalid port number\r\n} if the port is not a valid integer
      */
     private String handleListeningPort(List<String> args, ChannelHandlerContext ctx,
                                         ReplicationManager replMgr) {
@@ -85,8 +104,12 @@ public class ReplconfCommand implements ICommand {
     }
 
     /**
-     * Handles REPLCONF capa from replica.
-     * Replica announces its capabilities (e.g., psync2, eof).
+     * Process a REPLCONF CAPA subcommand and record the replica's announced capability.
+     *
+     * @param args    command arguments where args.get(1) is the capability to add
+     * @param ctx     channel handler context identifying the replica connection
+     * @param replMgr replication manager used to locate and update the ReplicaConnection
+     * @return        RESP_OK after recording the capability, or ERR_WRONG_ARGS if the capability argument is missing
      */
     private String handleCapa(List<String> args, ChannelHandlerContext ctx,
                               ReplicationManager replMgr) {
@@ -105,8 +128,16 @@ public class ReplconfCommand implements ICommand {
     }
 
     /**
-     * Handles REPLCONF ACK from replica.
-     * Replica reports the number of bytes it has processed.
+     * Process the REPLCONF ACK subcommand from a replica.
+     *
+     * Updates the replica's acknowledged replication offset based on the offset value provided in the command.
+     *
+     * @param args command arguments where args.get(1) is the acknowledged offset in bytes
+     * @param ctx the channel handler context for the replica connection
+     * @param replMgr the replication manager controlling replica state
+     * @return "-ERR wrong number of arguments for 'REPLCONF' command\r\n" if arguments are missing,
+     *         "-ERR invalid offset\r\n" if the offset cannot be parsed as a number,
+     *         `null` on successful processing to indicate no response should be sent
      */
     private String handleAck(List<String> args, ChannelHandlerContext ctx,
                              ReplicationManager replMgr) {
@@ -131,8 +162,9 @@ public class ReplconfCommand implements ICommand {
     }
 
     /**
-     * Handles REPLCONF GETACK from master.
-     * This is received by replicas; they should respond with ACK.
+     * Responds to a REPLCONF GETACK by returning a RESP multi-bulk containing the current acknowledged offset when running as a replica.
+     *
+     * @return the RESP multi-bulk string: ["REPLCONF","ACK",<offset>] when this node is a slave; `null` when this node is a master (no response).
      */
     private String handleGetAck(List<String> args, ChannelHandlerContext ctx,
                                 ReplicationManager replMgr) {
@@ -147,6 +179,11 @@ public class ReplconfCommand implements ICommand {
         return null;
     }
 
+    /**
+     * The identifier for this command implementation used to register and look up the command.
+     *
+     * @return the command name "REPLCONF"
+     */
     @Override
     public String name() {
         return "REPLCONF";

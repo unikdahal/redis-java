@@ -139,11 +139,14 @@ public class ReplicaConnection {
     // ==================== Constructor ====================
 
     /**
-     * Creates a new replica connection tracker.
+     * Create a tracker for a replica connection and initialize its replication state.
      *
-     * @param channel The Netty channel to the replica
-     * @param host The replica's hostname/IP
-     * @param port The replica's port
+     * <p>Initializes the connection state to CONNECTING, acknowledged and expected offsets to 0,
+     * capabilities to an empty list, and listening port to -1.</p>
+     *
+     * @param channel the Netty channel to the replica
+     * @param host the replica's hostname or IP address
+     * @param port the replica's port number
      */
     public ReplicaConnection(Channel channel, String host, int port) {
         this.channel = channel;
@@ -159,17 +162,14 @@ public class ReplicaConnection {
     // ==================== Command Propagation ====================
 
     /**
-     * Propagates a command to this replica using zero-copy ByteBuf.
+     * Sends a RESP-encoded command to the replica and increments the connection's expected offset.
      *
-     * <p><b>Performance Notes:</b>
-     * <ul>
-     *   <li>Uses Unpooled.wrappedBuffer for zero-copy</li>
-     *   <li>Updates expectedOffset before write (conservative)</li>
-     *   <li>Non-blocking write via Netty's event loop</li>
-     * </ul>
+     * <p>If the underlying channel is not active or the replica is not in the STREAMING state, the
+     * method does nothing and returns {@code false}. When a write is attempted, the expected offset
+     * is incremented by the command byte length before sending.
      *
-     * @param respCommand The RESP-encoded command bytes
-     * @return true if write was attempted, false if channel not ready
+     * @param respCommand the RESP-encoded command bytes to send
+     * @return {@code true} if a write was attempted, {@code false} if the channel was not ready or the replica was not streaming
      */
     public boolean propagateCommand(byte[] respCommand) {
         // Guard: only propagate to active, streaming replicas
@@ -188,11 +188,10 @@ public class ReplicaConnection {
     }
 
     /**
-     * Propagates a command (string version).
-     * Convenience method that converts to UTF-8 bytes.
+     * Propagates a RESP-encoded command to the replica.
      *
-     * @param respCommand The RESP-encoded command string
-     * @return true if write was attempted
+     * @param respCommand RESP-encoded command as a UTF-8 string
+     * @return `true` if a write was attempted to the replica, `false` otherwise
      */
     public boolean propagateCommand(String respCommand) {
         return propagateCommand(respCommand.getBytes(StandardCharsets.UTF_8));
@@ -201,10 +200,9 @@ public class ReplicaConnection {
     // ==================== Offset Management ====================
 
     /**
-     * Updates the acknowledged offset from REPLCONF ACK.
-     * Called when replica reports bytes it has processed.
+     * Record the replica's acknowledged replication offset reported via REPLCONF ACK.
      *
-     * @param offset The offset value from REPLCONF ACK
+     * @param offset the replica's acknowledged byte offset; callers should provide a value greater than or equal to the previous acknowledgement
      */
     public void updateAcknowledgedOffset(long offset) {
         // Use set() for simplicity; ACKs should be monotonically increasing
@@ -223,9 +221,9 @@ public class ReplicaConnection {
     }
 
     /**
-     * Calculates the replication lag (bytes not yet acknowledged).
+     * Returns the number of bytes sent to the replica that have not yet been acknowledged.
      *
-     * @return Bytes sent but not yet acknowledged (always >= 0)
+     * @return the number of unacknowledged bytes (zero or greater)
      */
     public long getReplicationLag() {
         return Math.max(0, expectedOffset.get() - acknowledgedOffset.get());
@@ -234,9 +232,9 @@ public class ReplicaConnection {
     // ==================== State Management ====================
 
     /**
-     * Updates the replica's state in the state machine.
+     * Set the replica's lifecycle state.
      *
-     * @param state The new state
+     * @param state the new lifecycle state for this replica
      */
     public void setState(ReplicaState state) {
         this.state = state;
@@ -254,19 +252,21 @@ public class ReplicaConnection {
     // ==================== Capability Management ====================
 
     /**
-     * Adds a capability announced by the replica.
+     * Record a capability announced by the replica in the negotiated capabilities list.
      *
-     * @param capability The capability name (e.g., "psync2")
+     * This method is safe to call concurrently.
+     *
+     * @param capability the capability name (e.g., "psync2")
      */
     public void addCapability(String capability) {
         capabilities.add(capability);
     }
 
     /**
-     * Checks if replica has a specific capability.
+     * Determines if the replica announced the given capability.
      *
-     * @param capability The capability to check
-     * @return true if replica announced this capability
+     * @param capability capability identifier to check
+     * @return `true` if the replica announced this capability, `false` otherwise
      */
     public boolean hasCapability(String capability) {
         return capabilities.contains(capability);
@@ -284,33 +284,56 @@ public class ReplicaConnection {
     }
 
     /**
-     * Gets the replica's listening port.
-     * Returns -1 if not yet reported.
+     * Get the replica's listening port.
      *
-     * @return Listening port or -1
+     * @return the listening port, or -1 if the replica has not reported a listening port
      */
     public int getListeningPort() {
         return listeningPort;
     }
 
-    // ==================== Getters ====================
+    /**
+     * Netty channel used to communicate with the replica.
+     *
+     * @return the Netty Channel for this replica connection
+     */
 
     public Channel getChannel() {
         return channel;
     }
 
+    /**
+     * Host name or IP address of the replica.
+     *
+     * @return the replica's host name or IP address
+     */
     public String getHost() {
         return host;
     }
 
+    /**
+     * Get the configured remote port for this replica connection.
+     *
+     * @return the configured remote port (the port provided at construction); note this is not the replica-reported listening port returned by {@code getListeningPort()}.
+     */
     public int getPort() {
         return port;
     }
 
+    /**
+     * Gets the latest byte offset the replica has acknowledged processing.
+     *
+     * @return the latest acknowledged byte offset from the replica (0 if none reported)
+     */
     public long getAcknowledgedOffset() {
         return acknowledgedOffset.get();
     }
 
+    /**
+     * Get the total number of bytes sent to the replica that the master expects to be acknowledged.
+     *
+     * @return the total number of bytes sent to the replica and awaiting acknowledgment
+     */
     public long getExpectedOffset() {
         return expectedOffset.get();
     }
@@ -327,7 +350,13 @@ public class ReplicaConnection {
         }
     }
 
-    // ==================== Object Methods ====================
+    /**
+     * Human-readable representation of the replica connection including host, effective port,
+     * state, and current replication lag.
+     *
+     * @return a string containing the replica's host, effective port (listening port if reported,
+     *         otherwise configured port), current state, and replication lag in bytes
+     */
 
     @Override
     public String toString() {

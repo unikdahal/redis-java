@@ -80,6 +80,11 @@ public class RPushCommand implements ICommand {
         return "RPUSH";
     }
 
+    /**
+     * Indicates that this command mutates the database state.
+     *
+     * @return `true` if the command performs a write operation, `false` otherwise.
+     */
     @Override
     public boolean isWriteCommand() {
         return true;

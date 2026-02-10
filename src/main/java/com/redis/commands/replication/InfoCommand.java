@@ -30,6 +30,17 @@ public class InfoCommand implements ICommand {
         STATIC_SERVER_HEADER = sb.toString();
     }
 
+    /**
+     * Assembles the requested Redis INFO sections and returns them in Redis Bulk String format.
+     *
+     * If no section is specified (or the first argument is "all"), the response includes the
+     * server, replication, clients, memory, and stats sections. Valid section names are:
+     * "server", "replication", "clients", "memory", and "stats".
+     *
+     * @param args optional arguments where the first element selects which INFO section to include;
+     *             when omitted or "all", all sections are included
+     * @return a Redis Bulk String containing the requested INFO content (format: $&lt;length&gt;\r\n&lt;content&gt;\r\n)
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         String section = args.isEmpty() ? "all" : args.get(0).toLowerCase();
@@ -58,6 +69,14 @@ public class InfoCommand implements ICommand {
         return "$" + content.length() + "\r\n" + content + "\r\n";
     }
 
+    /**
+     * Appends the "Server" INFO section to the provided StringBuilder.
+     *
+     * The section includes the precomputed server header, `tcp_port`, `uptime_in_seconds`,
+     * and `uptime_in_days`, and is terminated with an empty line.
+     *
+     * @param sb the StringBuilder to append the server information to; this builder is modified
+     */
     private void appendServerInfo(StringBuilder sb) {
         long uptimeMs = System.currentTimeMillis() - SERVER_START_TIME;
         sb.append(STATIC_SERVER_HEADER);
@@ -67,14 +86,33 @@ public class InfoCommand implements ICommand {
         sb.append("\r\n");
     }
 
+    /**
+     * Appends the replication section content to the given StringBuilder.
+     *
+     * Appends the replication manager's INFO output followed by a CRLF ("\r\n").
+     */
     private void appendReplicationInfo(StringBuilder sb) {
         sb.append(ReplicationManager.getInstance().getInfoReplication()).append("\r\n");
     }
 
+    /**
+     * Appends the "Clients" INFO section to the provided StringBuilder.
+     *
+     * @param sb the StringBuilder to append the Clients section to; receives `connected_clients` and `blocked_clients` lines
+     */
     private void appendClientsInfo(StringBuilder sb) {
         sb.append("# Clients\r\nconnected_clients:1\r\nblocked_clients:0\r\n\r\n");
     }
 
+    /**
+     * Appends the "Memory" INFO section to the provided StringBuilder.
+     *
+     * The section includes `used_memory`, a human-readable `used_memory_human`,
+     * `total_system_memory`, and a human-readable `total_system_memory_human`,
+     * followed by a blank line.
+     *
+     * @param sb the StringBuilder to append the Memory section to
+     */
     private void appendMemoryInfo(StringBuilder sb) {
         Runtime rt = Runtime.getRuntime();
         long usedMemory = rt.totalMemory() - rt.freeMemory();
@@ -88,14 +126,23 @@ public class InfoCommand implements ICommand {
         sb.append("\r\n");
     }
 
+    /**
+     * Append the Redis INFO "Stats" section to the provided StringBuilder.
+     *
+     * @param sb the StringBuilder to append the Stats section to
+     */
     private void appendStatsInfo(StringBuilder sb) {
         sb.append("# Stats\r\ntotal_connections_received:1\r\ntotal_commands_processed:0\r\n\r\n");
     }
 
     /**
-     * Optimized byte formatter:
-     * 1. Appends directly to existing StringBuilder to avoid temporary String objects.
-     * 2. Uses basic math instead of expensive String.format().
+     * Append a human-readable representation of a byte count to the given StringBuilder using unit suffixes.
+     *
+     * Formats values as bytes ("B") or with one decimal place using "K", "M", or "G" as appropriate and appends
+     * the result directly to the provided StringBuilder.
+     *
+     * @param sb the StringBuilder to append the formatted value to
+     * @param bytes the byte count to format
      */
     private void formatBytes(StringBuilder sb, long bytes) {
         if (bytes < 1024) {
@@ -109,6 +156,11 @@ public class InfoCommand implements ICommand {
         }
     }
 
+    /**
+     * Provide the command name for this ICommand implementation.
+     *
+     * @return the command name "INFO"
+     */
     @Override
     public String name() {
         return "INFO";

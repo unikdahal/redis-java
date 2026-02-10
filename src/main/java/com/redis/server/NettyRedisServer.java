@@ -34,10 +34,22 @@ public class NettyRedisServer {
 
     private final RedisConfig config;
 
+    /**
+     * Creates a NettyRedisServer configured with the provided RedisConfig.
+     *
+     * @param config the server configuration to use for startup and runtime settings
+     */
     public NettyRedisServer(RedisConfig config) {
         this.config = config;
     }
 
+    /**
+     * Starts the Netty-based Redis server: initializes replication state, configures networking,
+     * binds to the configured port, optionally connects to a master when running as a replica,
+     * blocks until the server channel closes, and performs orderly shutdown and replication cleanup.
+     *
+     * @throws Exception if server startup, binding, connection to master, or shutdown encounters an error
+     */
     public void run() throws Exception {
         // Initialize replication
         initReplication();
@@ -104,7 +116,10 @@ public class NettyRedisServer {
     }
 
     /**
-     * Initializes replication based on configuration.
+     * Configure the replication role and master endpoint from the server configuration.
+     *
+     * If the server is configured as a replica, sets the replication role to SLAVE and
+     * records the configured master host and port; otherwise sets the role to MASTER.
      */
     private void initReplication() {
         ReplicationManager replMgr = ReplicationManager.getInstance();
@@ -139,6 +154,13 @@ public class NettyRedisServer {
         });
     }
 
+    /**
+     * Application entry point; parses command-line arguments, prints the resolved configuration,
+     * and starts the Netty-based Redis server.
+     *
+     * @param args command-line arguments forwarded to the configuration parser
+     * @throws Exception if configuration parsing or server startup fails
+     */
     public static void main(String[] args) throws Exception {
         RedisConfig config = RedisConfig.getInstance();
 

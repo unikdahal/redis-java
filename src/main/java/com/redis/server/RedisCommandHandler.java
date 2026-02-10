@@ -83,11 +83,25 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
     private static final int INCOMPLETE = Integer.MIN_VALUE;
 
     /**
-     * The main entry point called by Netty whenever new data arrives from the network.
-     * * @param ctx Context to interact with the channel pipeline (e.g., writing responses).
+     * Decode incoming TCP bytes into complete Redis (RESP) commands, execute or queue them
+     * (including transaction handling), enforce replica read-only rules, and write responses
+     * and replication propagation as needed.
      *
-     * @param in  The input ByteBuf containing raw bytes received from the OS.
-     * @param out (Unused) We write responses directly to ctx, rather than passing objects up the pipeline.
+     * Detailed behavior:
+     * - Supports pipelined commands in the input buffer and handles fragmented packets by
+     *   deferring processing until a full command is available.
+     * - Resolves commands from the registry; unknown commands produce an error and mark a
+     *   transaction as errored when applicable.
+     * - If the server is a replica, rejects write commands that are not allowed for replication.
+     * - Queues non-control commands when inside a MULTI/EXEC transaction and acknowledges with
+     *   RESP_QUEUED; otherwise executes commands and writes their responses.
+     * - On successful execution of propagatable commands, derives replication arguments and
+     *   propagates the command via the CommandPropagator.
+     *
+     * @param ctx the Netty channel context used to read channel state, write responses, and
+     *            access per-channel transaction state
+     * @param in  the input ByteBuf containing raw bytes to parse as RESP commands
+     * @param out unused; responses are written directly to the channel via {@code ctx}
      */
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
@@ -310,21 +324,31 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
     }
 
     /**
-     * Helper to write a response string back to the client.
-     * Uses an unpooled buffer because response strings are typically short lived.
+     * Writes the given response string to the channel and flushes it.
+     *
+     * @param ctx the Netty channel handler context to write to
+     * @param response the response string to send (encoded as UTF-8)
      */
     private void writeResponse(ChannelHandlerContext ctx, String response) {
         ctx.writeAndFlush(Unpooled.copiedBuffer(response, StandardCharsets.UTF_8));
     }
 
     /**
-     * Checks if a command is a replication-related command.
-     * These commands are allowed on replicas even though they may modify internal state.
+     * Determine whether the provided command name identifies a replication-related command.
+     *
+     * @param commandName the command name (expected in upper-case)
+     * @return `true` if the name is "REPLCONF" or "PSYNC", `false` otherwise
      */
     private boolean isReplicationCommand(String commandName) {
         return "REPLCONF".equals(commandName) || "PSYNC".equals(commandName);
     }
 
+    /**
+     * Handles uncaught exceptions from the Netty pipeline by logging the error and closing the channel.
+     *
+     * @param ctx   the ChannelHandlerContext for the current channel
+     * @param cause the thrown exception that triggered this handler
+     */
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         // Standard Netty error handling: log and close connection on fatal errors

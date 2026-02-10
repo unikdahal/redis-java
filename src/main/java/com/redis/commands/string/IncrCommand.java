@@ -74,11 +74,21 @@ public class IncrCommand implements ICommand {
         return result.get();
     }
 
+    /**
+     * Returns the command name handled by this implementation.
+     *
+     * @return the literal command name "INCR"
+     */
     @Override
     public String name() {
         return "INCR";
     }
 
+    /**
+     * Indicates whether this command modifies the Redis dataset.
+     *
+     * @return `true` if the command modifies the dataset, `false` otherwise.
+     */
     @Override
     public boolean isWriteCommand() {
         return true;

@@ -37,6 +37,22 @@ public class SetCommand implements ICommand {
      */
     private static final ThreadLocal<Long> lastComputedPxat = new ThreadLocal<>();
 
+    /**
+     * Execute the Redis SET command: store a key with a value, optional expiry, and optional NX/XX modifiers.
+     *
+     * Supports the options EX <seconds>, PX <milliseconds>, EXAT <seconds-timestamp>, PXAT <milliseconds-timestamp>,
+     * NX, and XX. When a relative expiry (EX or PX) is used, the computed absolute expiration timestamp is recorded
+     * in thread-local storage for replication rewriting.
+     *
+     * @param args command arguments: at minimum [key, value]; additional elements are parsed as options described above
+     * @param ctx  Netty channel context (not used for command semantics)
+     * @return one of the Redis protocol responses:
+     *         `+OK\r\n` on success when the key is set;
+     *         `$-1\r\n` when NX/XX conditions prevent a set;
+     *         `-ERR wrong number of arguments for 'SET' command\r\n` when args are insufficient;
+     *         `-ERR invalid expire time in set\r\n` for invalid expiry values;
+     *         `-ERR syntax error\r\n` for unrecognized or conflicting options.
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         // Clear any previous value
@@ -148,11 +164,21 @@ public class SetCommand implements ICommand {
         return RESP_OK;
     }
 
+    /**
+     * The Redis command name handled by this implementation.
+     *
+     * @return the command name "SET"
+     */
     @Override
     public String name() {
         return "SET";
     }
 
+    /**
+     * Indicates that this command modifies the dataset.
+     *
+     * @return `true` if the command modifies the dataset, `false` otherwise.
+     */
     @Override
     public boolean isWriteCommand() {
         return true;

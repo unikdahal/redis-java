@@ -150,6 +150,11 @@ public class LPopCommand implements ICommand {
         return "LPOP";
     }
 
+    /**
+     * Indicates whether this command modifies the database state.
+     *
+     * @return `true` if the command modifies the database state, `false` otherwise.
+     */
     @Override
     public boolean isWriteCommand() {
         return true;

@@ -59,11 +59,21 @@ public class LPushCommand implements ICommand {
         return ":" + resultSize.get() + "\r\n";
     }
 
+    /**
+     * The registered command name for this implementation.
+     *
+     * @return the command name ("LPUSH")
+     */
     @Override
     public String name() {
         return "LPUSH";
     }
 
+    /**
+     * Indicates that this command performs a write operation on the data store.
+     *
+     * @return `true` if the command modifies the data store, `false` otherwise
+     */
     @Override
     public boolean isWriteCommand() {
         return true;

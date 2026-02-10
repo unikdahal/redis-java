@@ -64,27 +64,23 @@ public interface ICommand {
     String execute(List<String> args, ChannelHandlerContext ctx);
 
     /**
-     * Returns the command name (e.g., "SET", "GET", "DEL").
-     * Command names are case-insensitive at lookup time.
-     */
+ * Provides the canonical name of the command.
+ *
+ * @return the command name (e.g., "SET", "GET", "DEL"); lookup of command names is case-insensitive
+ */
     String name();
 
     /**
-     * Returns the canonical arguments for replication.
-     * <p>
-     * Override this method when the command needs to be rewritten for replication
-     * to ensure a consistent state across replicas. Common cases include:
-     * <ul>
-     *   <li>Auto-generated values (e.g., XADD with * ID → actual ID)</li>
-     *   <li>Relative time to absolute time (e.g., SET EX 60 → SET PXAT timestamp)</li>
-     * </ul>
-     * <p>
-     * The default implementation returns null, indicating the original args
-     * should be used for propagation.
+     * Provide the canonical argument list to use when propagating this command to replicas.
      *
-     * @param originalArgs The original command arguments
-     * @param response The response from execute() - can be used to extract generated values
-     * @return Canonical arguments for replication, or null to use original args
+     * <p>Override to return a fixed, canonical form when replication must not depend on
+     * client-provided or runtime-generated values (for example: generated IDs, or relative
+     * time arguments converted to absolute timestamps).
+     *
+     * @param originalArgs the original command arguments (excluding command name)
+     * @param response the response produced by {@link #execute(List, io.netty.channel.ChannelHandlerContext)},
+     *                 which may contain generated values needed to form canonical args
+     * @return the canonical arguments to replicate, or `null` to indicate the original arguments should be used
      */
     default List<String> getReplicationArgs(List<String> originalArgs, String response) {
         return null; // Default: use original args
@@ -103,14 +99,12 @@ public interface ICommand {
     }
 
     /**
-     * Returns the command name to use for replication.
-     * <p>
-     * Override when the command should be replicated as a different command.
-     * For example, EXPIRE should be replicated as PEXPIREAT to use absolute timestamps.
-     * <p>
-     * Default returns null, meaning use the original command name.
+     * Specifies an alternative command name to use when replicating this command.
      *
-     * @return The command name to use for replication, or null to use original
+     * Override to substitute a different command name for replication (for example,
+     * replicate EXPIRE as PEXPIREAT to use absolute timestamps).
+     *
+     * @return the replication command name, or `null` to use the original command name
      */
     default String getReplicationCommandName() {
         return null;

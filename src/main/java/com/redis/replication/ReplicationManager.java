@@ -179,7 +179,14 @@ public class ReplicationManager {
     /** Shutdown flag for graceful termination */
     private volatile boolean shuttingDown;
 
-    // ==================== Constructor ====================
+    /**
+     * Initialize a new ReplicationManager with default role, replication identifiers, and
+     * all internal data structures required for replication management.
+     *
+     * <p>Sets the node role to MASTER, generates the primary replication ID, initializes the
+     * replication log and replica registry, and creates counters and health-tracking maps
+     * used for propagation, backlog, and circuit-breaker logic.</p>
+     */
 
     private ReplicationManager() {
         // Identity
@@ -211,6 +218,13 @@ public class ReplicationManager {
         this.shuttingDown = false;
     }
 
+    /**
+     * Lazily obtains the globally shared ReplicationManager singleton.
+     *
+     * The instance is created on first access and is safe for concurrent use by multiple threads.
+     *
+     * @return the shared ReplicationManager singleton instance
+     */
     public static ReplicationManager getInstance() {
         ReplicationManager instance = INSTANCE;
         if (instance == null) {
@@ -224,7 +238,11 @@ public class ReplicationManager {
         return instance;
     }
 
-    // ==================== Replication ID Generation ====================
+    /**
+     * Generates a cryptographically secure 40-character hexadecimal replication identifier.
+     *
+     * @return a 40-character string containing lowercase hexadecimal characters (0-9, a-f)
+     */
 
     private String generateReplicationId() {
         SecureRandom random = new SecureRandom();
@@ -236,25 +254,51 @@ public class ReplicationManager {
         return sb.toString();
     }
 
-    // ==================== Role Management ====================
+    /**
+     * Set the server's replication role.
+     *
+     * @param newRole the server role to assign (e.g., MASTER or SLAVE)
+     */
 
     public void setRole(ServerRole newRole) {
         this.role.set(newRole);
     }
 
+    /**
+     * Get the current server role of this node.
+     *
+     * @return the current {@link ServerRole} indicating whether the node is MASTER or SLAVE
+     */
     public ServerRole getRole() {
         return role.get();
     }
 
+    /**
+     * Determine whether this node currently holds the MASTER role.
+     *
+     * @return `true` if the node's role is MASTER, `false` otherwise.
+     */
     public boolean isMaster() {
         return role.get() == ServerRole.MASTER;
     }
 
+    /**
+     * Checks whether this node is currently operating in the SLAVE role.
+     *
+     * @return `true` if the server role is SLAVE, `false` otherwise.
+     */
     public boolean isSlave() {
         return role.get() == ServerRole.SLAVE;
     }
 
-    // ==================== Master Info (Slave Mode) ====================
+    /**
+     * Configure the node with the master's address and mark this node as a SLAVE.
+     *
+     * Sets the master's host and port used for replication and updates the server role to SLAVE.
+     *
+     * @param host the master's hostname or IP address
+     * @param port the master's TCP port
+     */
 
     public void setMasterInfo(String host, int port) {
         this.masterHost = host;
@@ -262,23 +306,50 @@ public class ReplicationManager {
         this.role.set(ServerRole.SLAVE);
     }
 
+    /**
+     * The configured master host for this node.
+     *
+     * @return the master host, or null if no master is configured
+     */
     public String getMasterHost() {
         return masterHost;
     }
 
+    /**
+     * Get the configured master TCP port.
+     *
+     * @return the configured master's port number
+     */
     public int getMasterPort() {
         return masterPort;
     }
 
+    /**
+     * Set the active master connection for this replication manager.
+     *
+     * @param connection the MasterConnection to associate with this manager; may be {@code null} to clear the active connection
+     */
     public void setMasterConnection(MasterConnection connection) {
         this.masterConnection = connection;
     }
 
+    /**
+     * Get the currently configured master connection.
+     *
+     * @return the active MasterConnection instance, or null if no master connection is set
+     */
     public MasterConnection getMasterConnection() {
         return masterConnection;
     }
 
-    // ==================== Replica Management (Master Mode) ====================
+    /**
+     * Register a new replica connection and initialize its per-replica health tracking.
+     *
+     * @param channel the network channel for the replica
+     * @param host    the replica's host address
+     * @param port    the replica's port number
+     * @return        the created and registered ReplicaConnection
+     */
 
     public ReplicaConnection addReplica(Channel channel, String host, int port) {
         ReplicaConnection replica = new ReplicaConnection(channel, host, port);
@@ -289,10 +360,24 @@ public class ReplicationManager {
         return replica;
     }
 
+    /**
+     * Retrieve the replica registration associated with a Netty channel.
+     *
+     * @param channel the channel used as the key for the replica
+     * @return the ReplicaConnection for the given channel, or {@code null} if no replica is registered for that channel
+     */
     public ReplicaConnection getReplica(Channel channel) {
         return replicas.get(channel);
     }
 
+    /**
+     * Unregisters the replica associated with the given channel and clears its health tracking.
+     *
+     * Removes any replica state tied to the provided Channel (replica registry, failure counts,
+     * and circuit-breaker trip time). If a replica was removed, logs a disconnection message.
+     *
+     * @param channel the channel identifying the replica to remove
+     */
     public void removeReplica(Channel channel) {
         ReplicaConnection removed = replicas.remove(channel);
         replicaFailureCounts.remove(channel);
@@ -302,10 +387,21 @@ public class ReplicationManager {
         }
     }
 
+    /**
+     * Retrieves a collection view of all registered replica connections.
+     *
+     * @return a collection view of the current {@link ReplicaConnection} instances; the collection is backed by
+     *         the internal registry so changes to the registry are reflected in this collection
+     */
     public Collection<ReplicaConnection> getReplicas() {
         return replicas.values();
     }
 
+    /**
+     * Counts replicas that are currently in the STREAMING state.
+     *
+     * @return the number of replicas whose state is `ReplicaConnection.ReplicaState.STREAMING`
+     */
     public int getConnectedReplicaCount() {
         int count = 0;
         for (ReplicaConnection r : replicas.values()) {
@@ -319,8 +415,13 @@ public class ReplicationManager {
     // ==================== Circuit Breaker ====================
 
     /**
-     * Checks if the circuit breaker is open (tripped) for a replica.
-     * Uses time-based recovery for self-healing.
+     * Determine whether the per-replica circuit breaker is currently open.
+     *
+     * If the breaker has been tripped but its recovery window has elapsed, this method resets the breaker
+     * (clears the trip timestamp and per-replica failure count) and returns `false`.
+     *
+     * @param channel the replica's Channel used as the circuit-breaker key
+     * @return `true` if the circuit breaker is currently open for the given channel, `false` otherwise
      */
     private boolean isCircuitBreakerOpen(Channel channel) {
         AtomicLong tripTime = circuitBreakerTripTimes.get(channel);
@@ -341,8 +442,11 @@ public class ReplicationManager {
     }
 
     /**
-     * Records a failure for circuit breaker tracking.
-     * Trips the breaker after threshold failures.
+     * Records a propagation failure for the replica identified by the given channel and trips its circuit breaker once failures reach the configured threshold.
+     *
+     * If the threshold is reached for the first time, marks the breaker as open by recording the current timestamp. Also increments the global propagation-failure counter.
+     *
+     * @param channel the replica channel for which to record the failure
      */
     private void recordReplicaFailure(Channel channel) {
         AtomicInteger failures = replicaFailureCounts.get(channel);
@@ -372,13 +476,14 @@ public class ReplicationManager {
     // ==================== Command Propagation ====================
 
     /**
-     * Propagates a command to all streaming replicas with advanced features:
-     * <ul>
-     *   <li>Circuit breaker protection per replica</li>
-     *   <li>Backpressure detection and handling</li>
-     *   <li>Zero-copy ByteBuf writes</li>
-     *   <li>Comprehensive statistics tracking</li>
-     * </ul>
+     * Propagates a RESP-encoded command to all connected replicas in STREAMING state and updates
+     * replication state, per-replica health, and propagation statistics.
+     *
+     * The method appends the command to the replication backlog, advances the master replication
+     * offset, attempts delivery to each streaming replica, and records successes, failures,
+     * backpressure events, and circuit-breaker skips.
+     *
+     * @param respCommand the command encoded as a RESP byte array to send to replicas
      */
     public void propagateToReplicas(byte[] respCommand) {
         if (!isMaster() || replicas.isEmpty() || shuttingDown) {
@@ -447,11 +552,22 @@ public class ReplicationManager {
         }
     }
 
+    /**
+     * Propagates a RESP-formatted command string to all connected replicas after encoding it as UTF-8.
+     *
+     * @param respCommand the RESP-formatted command to send to replicas
+     */
     public void propagateToReplicas(String respCommand) {
         propagateToReplicas(respCommand.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
-    // ==================== Replication Backlog ====================
+    /**
+     * Determines whether a partial resynchronization can be performed for the given replication id and offset.
+     *
+     * @param requestedReplId the replication ID presented by the replica requesting partial resync
+     * @param requestedOffset the replication offset from which the replica requests backlog data
+     * @return `true` if the requested replication ID matches one of the master's current IDs and the backlog can serve the requested offset, `false` otherwise
+     */
 
     public boolean canPartialResync(String requestedReplId, long requestedOffset) {
         if (!masterReplId.equals(requestedReplId) && !masterReplId2.get().equals(requestedReplId)) {
@@ -460,6 +576,12 @@ public class ReplicationManager {
         return replicationLog.canPartialResync(requestedOffset);
     }
 
+    /**
+     * Retrieve backlog data starting at a specified replication offset for partial resynchronization.
+     *
+     * @param fromOffset the replication offset (inclusive) to read backlog data from
+     * @return a byte array containing backlog bytes beginning at `fromOffset`, or `null` if partial resynchronization is not possible from that offset
+     */
     public byte[] getBacklogData(long fromOffset) {
         if (!replicationLog.canPartialResync(fromOffset)) {
             return null;
@@ -470,8 +592,17 @@ public class ReplicationManager {
     // ==================== WAIT Implementation ====================
 
     /**
-     * Waits for replicas to acknowledge with adaptive exponential backoff.
-     * More efficient than Redis's fixed polling interval.
+     * Waits until at least {@code numReplicas} replicas have acknowledged the current master replication offset,
+     * using an adaptive exponential backoff while polling for acknowledgments.
+     *
+     * Requests acknowledgments from STREAMING replicas and returns as soon as the required number have acknowledged
+     * or the timeout elapses.
+     *
+     * @param numReplicas the number of replica acknowledgments required
+     * @param timeoutMs the maximum time to wait in milliseconds
+     * @return the number of replicas that have acknowledged the master offset when the method returns;
+     *         returns 0 if not running as master or there are no replicas; if the master offset is zero returns
+     *         the current count of connected replicas
      */
     public int waitForReplicas(int numReplicas, long timeoutMs) {
         if (!isMaster() || replicas.isEmpty()) {
@@ -511,6 +642,11 @@ public class ReplicationManager {
         return countAcknowledgedReplicas(targetOffset);
     }
 
+    /**
+     * Sends a REPLCONF GETACK request to all replicas currently in STREAMING state.
+     *
+     * This asks each streaming replica to report its replication acknowledgment offset.
+     */
     private void requestAckFromReplicas() {
         byte[] cmd = "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n"
             .getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -523,6 +659,12 @@ public class ReplicationManager {
         }
     }
 
+    /**
+     * Count replicas in STREAMING state that have acknowledged the given replication offset.
+     *
+     * @param targetOffset the replication offset to check acknowledgments against
+     * @return the number of replicas in STREAMING state that have acknowledged at least {@code targetOffset}
+     */
     private int countAcknowledgedReplicas(long targetOffset) {
         int count = 0;
         for (ReplicaConnection replica : replicas.values()) {
@@ -534,33 +676,130 @@ public class ReplicationManager {
         return count;
     }
 
-    // ==================== Accessors ====================
+    /**
+ * Returns the primary replication ID used to identify this master instance.
+ *
+ * @return the 40-character hexadecimal master replication ID
+ */
 
     public String getMasterReplId() { return masterReplId; }
-    public String getMasterReplId2() { return masterReplId2.get(); }
-    public long getMasterReplOffset() { return masterReplOffset.get(); }
-    public void setMasterReplOffset(long offset) { masterReplOffset.set(offset); }
-    public void incrementMasterReplOffset(long bytes) { masterReplOffset.addAndGet(bytes); }
+    /**
+ * Get the secondary replication ID used for PSYNC2.
+ *
+ * @return the secondary replication ID as a 40-character hexadecimal string, or {@code null} if not set
+ */
+public String getMasterReplId2() { return masterReplId2.get(); }
+    /**
+ * Gets the current master replication offset.
+ *
+ * @return the current master replication offset
+ */
+public long getMasterReplOffset() { return masterReplOffset.get(); }
+    /**
+ * Update the master replication offset used to track replication progress and backlog state.
+ *
+ * <p>This value represents the absolute byte offset of the master's replication stream and
+ * is used for progress tracking, backlog window calculations, and determining partial resynchronization eligibility.
+ *
+ * @param offset the new master replication offset in bytes (absolute offset since replication start)
+ */
+public void setMasterReplOffset(long offset) { masterReplOffset.set(offset); }
+    /**
+ * Adds the specified number of bytes to the master's replication offset.
+ *
+ * @param bytes the number of bytes to add to the master's replication offset; may be negative to decrement the offset
+ */
+public void incrementMasterReplOffset(long bytes) { masterReplOffset.addAndGet(bytes); }
 
-    public ReplicationLog getReplicationLog() { return replicationLog; }
-    public boolean isBacklogActive() { return replicationLog.isActive(); }
-    public int getBacklogSize() { return replicationLog.getBufferSize(); }
-    public long getBacklogFirstOffset() { return replicationLog.getFirstAvailableOffset(); }
+    /**
+ * Accesses the replication backlog and history manager used for partial resynchronization and backlog operations.
+ *
+ * @return the ReplicationLog managing backlog data and partial-resync support
+ */
+public ReplicationLog getReplicationLog() { return replicationLog; }
+    /**
+ * Check whether the replication backlog is currently active.
+ *
+ * @return `true` if the replication backlog is active, `false` otherwise.
+ */
+public boolean isBacklogActive() { return replicationLog.isActive(); }
+    /**
+ * Get current size of the replication backlog buffer.
+ *
+ * @return the current backlog size in bytes
+ */
+public int getBacklogSize() { return replicationLog.getBufferSize(); }
+    /**
+ * Returns the offset of the earliest byte retained in the replication backlog.
+ *
+ * @return the first available backlog offset (the base offset from which backlog data can be read)
+ */
+public long getBacklogFirstOffset() { return replicationLog.getFirstAvailableOffset(); }
 
-    // ==================== Statistics ====================
+    /**
+ * Get the total number of commands that have been propagated to replicas.
+ *
+ * @return the total number of propagated commands
+ */
 
     public long getCommandsPropagated() { return commandsPropagated.sum(); }
-    public long getBytesPropagated() { return bytesPropagated.sum(); }
-    public long getPartialResyncs() { return partialResyncs.sum(); }
-    public long getFullResyncs() { return fullResyncs.sum(); }
-    public long getPropagationFailures() { return propagationFailures.sum(); }
-    public long getBackpressureEvents() { return backpressureEvents.sum(); }
-    public int getReplicasWithBackpressure() { return replicasWithBackpressure.get(); }
+    /**
+ * Retrieve the cumulative number of bytes propagated to replicas.
+ *
+ * @return the total number of bytes that have been propagated to replicas
+ */
+public long getBytesPropagated() { return bytesPropagated.sum(); }
+    /**
+ * Get the total number of successful partial resynchronizations performed.
+ *
+ * @return the total count of successful partial resynchronizations.
+ */
+public long getPartialResyncs() { return partialResyncs.sum(); }
+    /**
+ * Report the total number of full resynchronizations performed.
+ *
+ * @return the total count of full resynchronizations recorded
+ */
+public long getFullResyncs() { return fullResyncs.sum(); }
+    /**
+ * Total number of propagation failures recorded by the replication manager.
+ *
+ * @return the total count of replication propagation failures
+ */
+public long getPropagationFailures() { return propagationFailures.sum(); }
+    /**
+ * Number of backpressure events recorded.
+ *
+ * @return the cumulative count of times replicas were skipped due to backpressure
+ */
+public long getBackpressureEvents() { return backpressureEvents.sum(); }
+    /**
+ * Reports how many connected replicas are currently experiencing backpressure.
+ *
+ * @return the number of replicas currently experiencing backpressure
+ */
+public int getReplicasWithBackpressure() { return replicasWithBackpressure.get(); }
 
-    public void incrementPartialResyncs() { partialResyncs.increment(); }
-    public void incrementFullResyncs() { fullResyncs.increment(); }
+    /**
+ * Increment the recorded count of successful partial resynchronizations by one.
+ */
+public void incrementPartialResyncs() { partialResyncs.increment(); }
+    /**
+ * Record a completed full resynchronization by incrementing the full-resync counter.
+ */
+public void incrementFullResyncs() { fullResyncs.increment(); }
 
-    // ==================== INFO Output ====================
+    /**
+     * Builds an INFO-style replication status block reflecting the current replication role,
+     * connections, backlog state, and propagation statistics.
+     *
+     * For master role the block includes connected_slaves, per-slave `slaveN` lines (ip,port,state,offset,lag),
+     * master replication IDs and offsets, backlog metrics, and enhanced propagation statistics.
+     * For slave role the block includes master_host, master_port, master_link_status, master_replid,
+     * and master_repl_offset.
+     *
+     * @return the replication INFO block as a CRLF-separated string of key:value lines suitable for monitoring or admin output.
+     */
 
     public String getInfoReplication() {
         StringBuilder sb = new StringBuilder(2048);
@@ -614,7 +853,12 @@ public class ReplicationManager {
         return sb.toString();
     }
 
-    // ==================== Lifecycle ====================
+    /**
+     * Shuts down the replication manager, closing all replica connections and clearing replication state.
+     *
+     * Sets the shutdown flag, closes each registered ReplicaConnection, removes them from the registry,
+     * and clears per-replica failure counters and circuit-breaker timestamps.
+     */
 
     public void shutdown() {
         shuttingDown = true;
@@ -627,6 +871,11 @@ public class ReplicationManager {
         circuitBreakerTripTimes.clear();
     }
 
+    /**
+     * Shuts down the current ReplicationManager instance (if any) and clears the singleton so a fresh instance can be created.
+     *
+     * This method is thread-safe; it acquires the initialization lock before invoking shutdown on the existing instance and resetting the internal singleton reference to null.
+     */
     public static void reset() {
         synchronized (INIT_LOCK) {
             if (INSTANCE != null) {

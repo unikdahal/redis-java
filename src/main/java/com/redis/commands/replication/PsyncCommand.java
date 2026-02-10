@@ -31,6 +31,13 @@ public class PsyncCommand implements ICommand {
 
     private static final String ERR_WRONG_ARGS = "-ERR wrong number of arguments for 'PSYNC' command\r\n";
 
+    /**
+     * Handle the PSYNC command, initiating either a partial or full replication resynchronization for the connected replica.
+     *
+     * @param args the PSYNC arguments: expected to contain the replica's requested replication ID at index 0 and the requested offset at index 1
+     * @param ctx the Netty channel handler context for the replica connection
+     * @return an error reply string when the arguments are invalid (e.g., wrong number of arguments); otherwise `null` after the command response has been written to the channel
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.size() < 2) {
@@ -71,7 +78,12 @@ public class PsyncCommand implements ICommand {
     }
 
     /**
-     * Checks if we can do a partial resync based on replication ID and offset.
+     * Determine whether a partial resynchronization can be performed for the given replica request.
+     *
+     * @param requestedReplId  the replication ID provided by the replica (may be "?" to request full sync)
+     * @param requestedOffset  the replication offset provided by the replica (-1 indicates unknown/first sync)
+     * @param replMgr          the replication manager used to evaluate backlog-based partial resync eligibility
+     * @return                 `true` if a partial resync can be performed with the given ID and offset, `false` otherwise
      */
     private boolean canDoPartialResync(String requestedReplId, long requestedOffset,
                                         ReplicationManager replMgr) {
@@ -85,7 +97,16 @@ public class PsyncCommand implements ICommand {
     }
 
     /**
-     * Performs a partial resync: sends CONTINUE and backlog data.
+     * Perform a partial replication synchronization by acknowledging the replica and streaming any missing backlog data.
+     *
+     * Updates the replica state to STREAMING, sends a "+CONTINUE <masterReplId>\r\n" acknowledgement, writes backlog bytes
+     * from the given offset when available, and increments the partial resync counter.
+     *
+     * @param ctx the Netty channel context to write responses to
+     * @param replica the replica connection whose state will be updated
+     * @param replMgr the replication manager used to obtain master repl-id, backlog data, and to update statistics
+     * @param requestedOffset the replication offset from which to retrieve backlog data
+     * @return null (response already written to the provided ChannelHandlerContext)
      */
     private String performPartialResync(ChannelHandlerContext ctx, ReplicaConnection replica,
                                         ReplicationManager replMgr, long requestedOffset) {
@@ -118,7 +139,12 @@ public class PsyncCommand implements ICommand {
     }
 
     /**
-     * Performs a full resync: sends FULLRESYNC response followed by RDB file.
+     * Initiates a full replication resynchronization by sending a FULLRESYNC reply and streaming the RDB snapshot to the replica.
+     *
+     * @param ctx     the channel context for writing responses and RDB data to the replica
+     * @param replica the replica connection whose state will be updated for the full resync
+     * @param replMgr the replication manager providing master replication id/offset and statistics tracking
+     * @return        `null` (response and RDB have been written to the channel) 
      */
     private String performFullResync(ChannelHandlerContext ctx, ReplicaConnection replica,
                                      ReplicationManager replMgr) {
@@ -149,6 +175,11 @@ public class PsyncCommand implements ICommand {
         return null;
     }
 
+    /**
+     * Command name used to invoke this handler.
+     *
+     * @return the literal command name "PSYNC"
+     */
     @Override
     public String name() {
         return "PSYNC";

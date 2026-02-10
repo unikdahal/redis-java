@@ -214,12 +214,11 @@ public class ReplicationLog {
     }
 
     /**
-     * Gets backlog data from the specified offset.
-     * <p>
-     * Thread-safe for concurrent reads during partial resync.
+     * Retrieve backlog bytes starting at the given global offset for partial resynchronization.
+     * This method is safe for concurrent readers.
      *
-     * @param fromOffset The starting offset
-     * @return The data bytes, or null if offset is not available
+     * @param fromOffset the global offset to start reading from
+     * @return the bytes from {@code fromOffset} up to the current global offset; {@code null} if the requested offset is not available for partial resynchronization; an empty array if {@code fromOffset} equals the current global offset
      */
     public byte[] getDataFrom(long fromOffset) {
         rwLock.readLock().lock();
@@ -259,9 +258,9 @@ public class ReplicationLog {
     // ==================== Offset Accessors ====================
 
     /**
-     * Gets the current global replication offset.
+     * Retrieves the current global replication offset.
      *
-     * @return Total bytes written to the replication stream
+     * @return the total bytes written to the replication stream
      */
     public long getGlobalOffset() {
         return globalOffset.get();
@@ -288,9 +287,9 @@ public class ReplicationLog {
     // ==================== State Accessors ====================
 
     /**
-     * Checks if the backlog has any data.
+     * Indicates whether the backlog has ever been written to.
      *
-     * @return true if data has been written
+     * @return `true` if data has been written, `false` otherwise.
      */
     public boolean isActive() {
         return active;
@@ -306,9 +305,9 @@ public class ReplicationLog {
     }
 
     /**
-     * Gets the amount of data currently in the buffer.
+     * Number of bytes currently stored in the replication backlog.
      *
-     * @return Bytes of valid data (0 to bufferSize)
+     * @return the number of valid bytes available for reads; between 0 and bufferSize inclusive
      */
     public long getHistoryLength() {
         long offset = globalOffset.get();
@@ -319,18 +318,18 @@ public class ReplicationLog {
     // ==================== Statistics ====================
 
     /**
-     * Gets total bytes ever written to the backlog.
+     * Retrieve the cumulative number of bytes written to the backlog.
      *
-     * @return Cumulative byte count
+     * @return the cumulative number of bytes written
      */
     public long getTotalBytesWritten() {
         return totalBytesWritten.get();
     }
 
     /**
-     * Gets the number of eviction events.
+     * Number of times data was evicted (overwritten) from the ring buffer due to capacity or wraparound.
      *
-     * @return Eviction count
+     * @return the total eviction count
      */
     public long getEvictionCount() {
         return evictionCount.get();
@@ -339,10 +338,12 @@ public class ReplicationLog {
     // ==================== Reset ====================
 
     /**
-     * Resets the backlog to initial state.
-     * <p>
-     * <b>Warning:</b> This should only be called during server restart
-     * or testing. Active replicas will need full resync after reset.
+     * Reset the replication backlog to its initial empty state.
+     *
+     * <p>This marks the backlog inactive, clears global and first-available offsets and the write position,
+     * and resets statistics (total bytes written and eviction count). Active replicas will require a full
+     * resynchronization after this operation. This method acquires the write lock to perform the reset
+     * atomically and thread-safely; it should only be invoked during server restart or testing.
      */
     public void reset() {
         rwLock.writeLock().lock();
@@ -358,7 +359,11 @@ public class ReplicationLog {
         }
     }
 
-    // ==================== Debug ====================
+    /**
+     * Produce a concise diagnostic string describing the replication log's current state.
+     *
+     * @return a formatted string containing the buffer size, global offset, first available offset, history length, and active flag
+     */
 
     @Override
     public String toString() {

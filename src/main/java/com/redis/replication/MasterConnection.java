@@ -164,12 +164,12 @@ public class MasterConnection {
     // ==================== Connection Management ====================
 
     /**
-     * Initiates asynchronous connection to the master server.
+     * Establishes a TCP connection to the configured master and begins the replication handshake.
      *
-     * <p>Upon successful connection, automatically begins the
-     * replication handshake sequence.
+     * <p>On successful connection the method starts the handshake sequence (PING → REPLCONF → PSYNC).
      *
-     * @return CompletableFuture that completes when connection is established
+     * @return a CompletableFuture that completes when the connection to the master is established,
+     *         or completes exceptionally if the connection attempt fails
      */
     public CompletableFuture<Void> connect() {
         CompletableFuture<Void> future = new CompletableFuture<>();
@@ -183,6 +183,14 @@ public class MasterConnection {
          .option(ChannelOption.TCP_NODELAY, true)  // Disable Nagle for low latency
          .option(ChannelOption.SO_KEEPALIVE, true) // Enable TCP keepalive
          .handler(new ChannelInitializer<SocketChannel>() {
+             /**
+              * Initializes a newly accepted SocketChannel's pipeline for communication with the master.
+              *
+              * Adds a MasterResponseHandler to the channel pipeline to handle inbound replication messages
+              * and protocol parsing.
+              *
+              * @param ch the SocketChannel whose pipeline will be configured
+              */
              @Override
              protected void initChannel(SocketChannel ch) {
                  ch.pipeline().addLast(new MasterResponseHandler());
@@ -244,6 +252,20 @@ public class MasterConnection {
         /** Buffer for parsing RESP array elements */
         private final List<String> argsBuffer = new ArrayList<>();
 
+        /**
+         * Decodes inbound bytes from the master, handling RDB streaming and RESP responses.
+         *
+         * During each invocation this method:
+         * - If currently receiving an RDB, feeds bytes to the RDB handler until the RDB is complete; if more data is required it resets the reader index and returns.
+         * - Otherwise parses a single RESP response; if the buffer does not contain a full RESP value it resets the reader index and returns.
+         * - When a complete RESP response is parsed, routes the parsed arguments to the handshake/streaming response handler.
+         *
+         * The method consumes bytes from `in` as responses or RDB data are completed and may update the connection's handshake and streaming state via the response handlers.
+         *
+         * @param ctx the Netty channel handler context
+         * @param in  the inbound byte buffer to read from; reader index may be advanced or reset when incomplete data is encountered
+         * @param out the list to which decoded messages would be added (not used directly by this decoder)
+         */
         @Override
         protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
             while (in.readableBytes() > 0) {
@@ -273,11 +295,13 @@ public class MasterConnection {
         // ==================== RESP Parsing ====================
 
         /**
-         * Parses a single RESP value from the buffer.
+         * Parse a single RESP value from the provided buffer and append its textual parts to result.
          *
-         * @param buf Input buffer
-         * @param result Output list for parsed values
-         * @return true if complete value was parsed, false if more data needed
+         * If the buffer does not contain a complete RESP value, the reader index is not advanced and the method returns `false`.
+         *
+         * @param buf the ByteBuf containing RESP-encoded data; may be advanced when a full value is parsed
+         * @param result list to receive parsed string parts (bulk strings, simple strings, integers, and array elements) in encounter order
+         * @return `true` if a complete RESP value was parsed and appended to result, `false` if more data is required
          */
         private boolean parseRespResponse(ByteBuf buf, List<String> result) {
             if (buf.readableBytes() < 1) return false;
@@ -299,7 +323,11 @@ public class MasterConnection {
         }
 
         /**
-         * Parses a simple string (or error/integer) ending in CRLF.
+         * Parses a RESP simple string, error, or integer terminated by CRLF and appends the parsed text to the result list.
+         *
+         * @param buf    the ByteBuf positioned at the start of the RESP simple value
+         * @param result the list to which the parsed string will be appended
+         * @return `true` if a complete CRLF-terminated simple value was parsed and added to {@code result}, `false` otherwise
          */
         private boolean parseSimpleString(ByteBuf buf, List<String> result) {
             int start = buf.readerIndex();
@@ -313,7 +341,13 @@ public class MasterConnection {
         }
 
         /**
-         * Parses a bulk string: $<length>\r\n<data>\r\n
+         * Parses a RESP bulk string from the buffer and appends its value to the result list.
+         *
+         * If the bulk length is `-1` (null bulk string), `null` is appended to `result`.
+         *
+         * @param buf the ByteBuf to read the bulk string from; reader index is advanced on success and reset on incomplete input
+         * @param result list to which the parsed string (or `null` for a null bulk) will be appended
+         * @return `true` if a complete bulk string was parsed and appended to `result`, `false` if more bytes are required
          */
         private boolean parseBulkString(ByteBuf buf, List<String> result) {
             int start = buf.readerIndex();
@@ -341,7 +375,16 @@ public class MasterConnection {
         }
 
         /**
-         * Parses an array: *<count>\r\n followed by elements.
+         * Parses a RESP array from the buffer and appends its elements (flattened) to the provided result list.
+         *
+         * The method expects an array header of the form `*<count>\r\n` followed by <count> RESP elements.
+         * If the array count is `-1`, a single `null` is added to `result`.
+         * On successful parse the buffer's reader index is advanced past the entire array; if data is incomplete the
+         * reader index is restored to its original position and the method returns `false`.
+         *
+         * @param buf the ByteBuf containing RESP data; its reader index is advanced on successful parse
+         * @param result the list to receive parsed string elements (array elements are flattened into this list)
+         * @return `true` if a complete array was parsed and appended to `result`, `false` if more data is required or parsing failed
          */
         private boolean parseArray(ByteBuf buf, List<String> result) {
             int start = buf.readerIndex();
@@ -370,7 +413,11 @@ public class MasterConnection {
         }
 
         /**
-         * Parses an inline command (space-separated).
+         * Parses a CRLF-terminated inline (space-separated) command from the buffer and appends its parts to `result`.
+         *
+         * @param buf    the ByteBuf to read from; parsing requires a CRLF-terminated line
+         * @param result destination list to which command parts (split on spaces) will be added
+         * @return       `true` if a complete CRLF-terminated inline command was read and added to `result`, `false` if more bytes are needed
          */
         private boolean parseInlineCommand(ByteBuf buf, List<String> result) {
             int start = buf.readerIndex();
@@ -406,6 +453,14 @@ public class MasterConnection {
             }
         }
 
+        /**
+         * Handle the master's response to the initial PING during the replication handshake.
+         *
+         * If the response equals "PONG" (case-insensitive), advance the handshake state to
+         * REPLCONF_PORT_SENT and send a REPLCONF listening-port command with the local listening port.
+         *
+         * @param response the master's reply to PING (expected value: "PONG")
+         */
         private void handlePingResponse(String response) {
             if ("PONG".equalsIgnoreCase(response)) {
                 System.out.println("[Replication] Master responded to PING");
@@ -414,6 +469,14 @@ public class MasterConnection {
             }
         }
 
+        /**
+         * Processes the master's reply to the REPLCONF listening-port command.
+         *
+         * If the master responds with "OK" (case-insensitive), advances the handshake to
+         * REPLCONF_CAPA_SENT and sends a REPLCONF capabilities message requesting PSYNC2.
+         *
+         * @param response the master's textual response to the REPLCONF listening-port request
+         */
         private void handleReplconfPortResponse(String response) {
             if ("OK".equalsIgnoreCase(response)) {
                 System.out.println("[Replication] REPLCONF listening-port acknowledged");
@@ -422,6 +485,14 @@ public class MasterConnection {
             }
         }
 
+        /**
+         * Handles the server's response to the REPLCONF CAPA command.
+         *
+         * If the response equals "OK" (case-insensitive), advances the handshake to
+         * request PSYNC from the master.
+         *
+         * @param response the server reply to the REPLCONF CAPA command
+         */
         private void handleReplconfCapaResponse(String response) {
             if ("OK".equalsIgnoreCase(response)) {
                 System.out.println("[Replication] REPLCONF capa acknowledged");
@@ -430,6 +501,16 @@ public class MasterConnection {
             }
         }
 
+        /**
+         * Process the master's PSYNC reply and advance the handshake and RDB reception state.
+         *
+         * <p>If the response starts with {@code FULLRESYNC <replid> <offset>}, the method extracts the
+         * replication ID and offset, records the master's replication offset, and transitions to RDB
+         * loading mode (sets {@code loadingRdb=true} and {@code expectedRdbSize=-1}). If the response
+         * starts with {@code CONTINUE}, the method transitions to streaming mode and disables RDB loading.
+         *
+         * @param response the raw PSYNC reply line received from the master (e.g. {@code "FULLRESYNC <replid> <offset>"} or {@code "CONTINUE"})
+         */
         private void handlePsyncResponse(String response) {
             if (response.startsWith("FULLRESYNC")) {
                 // Parse: FULLRESYNC <replid> <offset>
@@ -454,10 +535,15 @@ public class MasterConnection {
         // ==================== RDB Handling ====================
 
         /**
-         * Handles incoming RDB file data.
+         * Accumulates RDB bytes from the provided input buffer until the full RDB file has been received.
          *
-         * @param in Input buffer
-         * @return true if RDB is complete, false if more data needed
+         * When the total size is not yet known this method reads the Redis bulk-string size marker and
+         * initializes an internal buffer for the expected RDB size. It appends available bytes into the
+         * buffer and, once the expected size is reached, processes the RDB, releases the buffer, clears
+         * the RDB-loading flag, and transitions the handshake state to STREAMING.
+         *
+         * @param in the incoming ByteBuf containing RDB data (may contain partial or multiple chunks)
+         * @return `true` if the full RDB file has been received and processed, `false` if additional data is required
          */
         private boolean handleRdbData(ByteBuf in) {
             // First, read the RDB size if not yet known
@@ -508,10 +594,11 @@ public class MasterConnection {
         }
 
         /**
-         * Processes the received RDB file.
-         * <p>
-         * For now, just acknowledges receipt. A full implementation
-         * would parse the RDB format and restore database state.
+         * Handle a complete RDB file received from the master.
+         *
+         * <p>Currently this implementation only acknowledges receipt and does not restore database state.
+         *
+         * @param rdb the ByteBuf containing the complete RDB file bytes
          */
         private void processRdbFile(ByteBuf rdb) {
             System.out.println("[Replication] RDB processing complete (empty database mode)");
@@ -520,7 +607,14 @@ public class MasterConnection {
         // ==================== Streaming Command Handling ====================
 
         /**
-         * Handles replicated commands from the master.
+         * Routes and handles a single replicated command received from the master.
+         *
+         * If the command is empty the method returns immediately. If the command is
+         * "REPLCONF GETACK" the method replies to the master with "REPLCONF ACK <offset>"
+         * using the current replication byte offset; otherwise the command is applied
+         * locally via executeReplicatedCommand.
+         *
+         * @param command a list of RESP-parsed tokens where the first element is the command name
          */
         private void handleStreamingCommand(List<String> command) {
             if (command.isEmpty()) return;
@@ -540,10 +634,18 @@ public class MasterConnection {
         }
 
         /**
-         * Executes a replicated write command on the local database.
-         * <p>
-         * This is a simplified implementation. A production version
-         * would use the command registry for consistency.
+         * Apply a replicated write command to the local RedisDatabase.
+         *
+         * <p>Handles a minimal set of replication write commands received from the master.
+         * Supported commands:
+         * <ul>
+         *   <li>SET key value [PX milliseconds | EX seconds] — stores a value with optional expiry</li>
+         *   <li>DEL key [key ...] — deletes one or more keys</li>
+         *   <li>INCR key — increments the numeric value of a key (creates key with 0 before increment)</li>
+         * </ul>
+         * Unsupported or malformed commands are ignored.
+         *
+         * @param command a List of strings where the first element is the command name and the remaining elements are its arguments (e.g., [\"SET\", \"key\", \"value\"])
          */
         private void executeReplicatedCommand(List<String> command) {
             if (command.isEmpty()) return;
@@ -585,7 +687,14 @@ public class MasterConnection {
             }
         }
 
-        // ==================== Error Handling ====================
+        /**
+         * Handles exceptions raised by the Netty pipeline for the master connection.
+         *
+         * Logs the error, closes the channel context, and marks the connection as not connected.
+         *
+         * @param ctx   the Netty channel handler context where the exception occurred
+         * @param cause the exception that was thrown
+         */
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -595,6 +704,11 @@ public class MasterConnection {
             connected = false;
         }
 
+        /**
+         * Handle the channel becoming inactive by marking the master connection as disconnected and logging the closure.
+         *
+         * @param ctx the Netty ChannelHandlerContext for the closed channel
+         */
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
             System.out.println("[Replication] Master connection closed");
@@ -605,7 +719,10 @@ public class MasterConnection {
     // ==================== Lifecycle Management ====================
 
     /**
-     * Disconnects from the master and releases resources.
+     * Close the replication connection and release associated network resources.
+     *
+     * Marks this connection as disconnected, closes the active Netty channel if present,
+     * and shuts down the worker event loop group.
      */
     public void disconnect() {
         connected = false;
@@ -617,20 +734,39 @@ public class MasterConnection {
         }
     }
 
-    // ==================== Status Methods ====================
+    /**
+     * Indicates whether the connection to the master is currently active.
+     *
+     * @return `true` if the client has an active channel to the master, `false` otherwise.
+     */
 
     public boolean isConnected() {
         return connected && channel != null && channel.isActive();
     }
 
+    /**
+     * Current handshake state of the connection to the master.
+     *
+     * @return the current HandshakeState representing replication handshake progress
+     */
     public HandshakeState getHandshakeState() {
         return handshakeState;
     }
 
+    /**
+     * Get the total number of bytes processed from the replication stream.
+     *
+     * @return the total number of bytes processed from the replication stream
+     */
     public long getBytesProcessed() {
         return bytesProcessed.get();
     }
 
+    /**
+     * Atomically increments the running total of replication bytes processed.
+     *
+     * @param bytes the number of bytes to add to the processed counter (in bytes); can be negative to decrement the counter
+     */
     public void addBytesProcessed(long bytes) {
         bytesProcessed.addAndGet(bytes);
     }

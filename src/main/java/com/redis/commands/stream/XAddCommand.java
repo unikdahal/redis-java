@@ -158,29 +158,35 @@ public class XAddCommand implements ICommand {
         return "$" + idStr.length() + "\r\n" + idStr + "\r\n";
     }
 
+    /**
+     * Provides the Redis command name handled by this class.
+     *
+     * @return the Redis command name "XADD"
+     */
     @Override
     public String name() {
         return "XADD";
     }
 
+    /**
+     * Indicates that this command modifies the dataset.
+     *
+     * @return `true` if the command modifies the dataset, `false` otherwise.
+     */
     @Override
     public boolean isWriteCommand() {
         return true;
     }
 
     /**
-     * Returns canonical arguments for replication.
-     * <p>
-     * For XADD, we must replace auto-generated IDs (* or timestamp-*) with
-     * the actual ID that was generated. This ensures replicas have the exact
-     * same entry ID as the master.
-     * <p>
-     * Example: {@code XADD stream * field value} with generated ID "123-0"
-     * becomes {@code XADD stream 123-0 field value} for replication.
+     * Produce replication-safe XADD arguments by substituting an auto-generated ID
+     * ("*" or "timestamp-*") with the actual ID extracted from the command response.
      *
-     * @param originalArgs The original arguments including potential * or timestamp-*
-     * @param response The response containing the generated ID
-     * @return Arguments with actual ID substituted for auto-generated ones
+     * @param originalArgs the original XADD arguments (key, id, followed by field/value pairs)
+     * @param response the RESP bulk-string response from the executed XADD command
+     * @return a new argument list with the actual ID substituted for the auto-generated one,
+     *         or `null` if no substitution is needed (explicit ID provided), the input is invalid,
+     *         or the response does not contain a parsable ID
      */
     @Override
     public List<String> getReplicationArgs(List<String> originalArgs, String response) {

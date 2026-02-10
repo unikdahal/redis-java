@@ -32,6 +32,18 @@ public class WaitCommand implements ICommand {
     private static final String ERR_INVALID_NUM = "-ERR numreplicas is not a non-negative integer\r\n";
     private static final String ERR_INVALID_TIMEOUT = "-ERR timeout is not a non-negative integer\r\n";
 
+    /**
+     * Execute the WAIT command: validate arguments and wait for the specified number of replicas
+     * to acknowledge within the given timeout.
+     *
+     * @param args a list where args.get(0) is the required number of replicas to wait for (non-negative integer)
+     *             and args.get(1) is the timeout in milliseconds (non-negative long)
+     * @return `ERR_WRONG_ARGS` if fewer than two arguments are provided,
+     *         `ERR_INVALID_NUM` if the replicas argument is not an integer >= 0,
+     *         `ERR_INVALID_TIMEOUT` if the timeout argument is not a long >= 0,
+     *         otherwise a Redis integer reply of the acknowledged replica count formatted as
+     *         ":" + acknowledged + "\r\n"
+     */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         if (args.size() < 2) {
@@ -77,6 +89,11 @@ public class WaitCommand implements ICommand {
         return ":" + acknowledged + "\r\n";
     }
 
+    /**
+     * Get the command name handled by this ICommand implementation.
+     *
+     * @return the command name "WAIT"
+     */
     @Override
     public String name() {
         return "WAIT";

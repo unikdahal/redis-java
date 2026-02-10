@@ -140,7 +140,10 @@ public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.Li
     }
 
     /**
-     * Utility to check type equality.
+     * Check whether this value's Redis type matches the given type.
+     *
+     * @param expectedType the Redis type to compare against
+     * @return {@code true} if the value's type equals {@code expectedType}, {@code false} otherwise
      */
     default boolean isType(Type expectedType) {
         return getType() == expectedType;
@@ -161,9 +164,9 @@ public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.Li
     }
 
     /**
-     * Checks if this value is expired (for snapshot consistency).
+     * Determine whether the value has passed its expiry time.
      *
-     * @return true if expired
+     * @return `true` if the value has an expiry time and that time is less than or equal to the current system time, `false` otherwise.
      */
     default boolean isExpired() {
         Long expiry = getExpiryTime();
@@ -171,12 +174,12 @@ public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.Li
     }
 
     /**
-     * Creates a copy of this value with an expiry time set.
-     * <p>
-     * Used during snapshot creation to preserve expiry metadata.
+     * Creates a copy of this value that carries an expiry timestamp.
      *
-     * @param expiryTimeMillis The expiry timestamp in milliseconds
-     * @return A new RedisValue with expiry set
+     * Used when creating snapshots to preserve expiry metadata.
+     *
+     * @param expiryTimeMillis the expiry timestamp in milliseconds since the Unix epoch
+     * @return a RedisValue that reports the given expiry time and delegates type/data access to this value
      */
     default RedisValue withExpiry(long expiryTimeMillis) {
         return new ExpiringValue(this, expiryTimeMillis);
@@ -340,6 +343,11 @@ public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.Li
             return stream;
         }
 
+        /**
+         * String representation of this RedisValue when it holds a stream.
+         *
+         * @return a string describing the value's type (`STREAM`) and its underlying stream data
+         */
         @Override
         public String toString() {
             return "RedisValue{type=STREAM, data=" + stream + "}";
@@ -353,61 +361,126 @@ public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.Li
      * This is a transient wrapper, not used for normal storage.
      */
     record ExpiringValue(RedisValue wrapped, long expiryTimeMillis) implements RedisValue {
+        /**
+         * Get the runtime RedisValue.Type of the wrapped value.
+         *
+         * @return the RedisValue.Type of the wrapped value
+         */
         @Override
         public Type getType() {
             return wrapped.getType();
         }
 
+        /**
+         * Get the underlying Java object used to represent this value for serialization and debugging.
+         *
+         * @return the wrapped value's underlying data object
+         */
         @Override
         public Object getData() {
             return wrapped.getData();
         }
 
+        /**
+         * The expiry time in milliseconds since the Unix epoch, or null when no expiry is set.
+         *
+         * @return the expiry time in milliseconds since epoch, or {@code null} if not set
+         */
         @Override
         public Long getExpiryTime() {
             return expiryTimeMillis;
         }
 
+        /**
+         * Checks whether the stored expiry time has been reached.
+         *
+         * @return `true` if the current system time is greater than or equal to the expiry time, `false` otherwise
+         */
         @Override
         public boolean isExpired() {
             return expiryTimeMillis <= System.currentTimeMillis();
         }
 
+        /**
+         * Create a new RedisValue wrapper that associates the same wrapped value with a different expiry timestamp.
+         *
+         * @param newExpiryTimeMillis the expiry time in milliseconds since the epoch
+         * @return a new RedisValue whose wrapped value is the same as this instance's wrapped value and whose expiry time is `newExpiryTimeMillis`
+         */
         @Override
         public RedisValue withExpiry(long newExpiryTimeMillis) {
             return new ExpiringValue(wrapped, newExpiryTimeMillis);
         }
 
+        /**
+         * Retrieve the stored string value from the wrapped RedisValue.
+         *
+         * @return the wrapped value's string
+         * @throws IllegalStateException if the wrapped value is not of type STRING
+         */
         @Override
         public String asString() {
             return wrapped.asString();
         }
 
+        /**
+         * Exposes the wrapped value as a list view.
+         *
+         * @return the underlying value as a List<String>
+         * @throws IllegalStateException if the wrapped value is not a list (WRONGTYPE)
+         */
         @Override
         public List<String> asList() {
             return wrapped.asList();
         }
 
+        /**
+         * Provides the set view of this value.
+         *
+         * @return the set of strings represented by this value
+         */
         @Override
         public Set<String> asSet() {
             return wrapped.asSet();
         }
 
+        /**
+         * Return the wrapped value as a hash map.
+         *
+         * @return the underlying map of field to value for the wrapped hash value
+         * @throws IllegalStateException if the wrapped value is not of type HASH
+         */
         @Override
         public Map<String, String> asHash() {
             return wrapped.asHash();
         }
 
+        /**
+         * Get the wrapped value as a sorted-set view.
+         *
+         * @return a map of members to their scores
+         * @throws IllegalStateException if the value's type is not SORTED_SET
+         */
         @Override
         public Map<String, Double> asSortedSet() {
             return wrapped.asSortedSet();
         }
 
+        /**
+         * Provides the stream entries indexed by StreamId for this value.
+         *
+         * @return a map from each `StreamId` to the entry's field-value map (`Map<String, String>`).
+         */
         @Override
         public Map<StreamId, Map<String, String>> asStream() {
             return wrapped.asStream();
         }
 
+        /**
+         * Provide a string representation of the expiring RedisValue that includes its runtime type, expiry timestamp, and wrapped data.
+         *
+         * @return a string containing the value's runtime type, the expiryTimeMillis, and the wrapped data
+         */
         @Override
         public String toString() {
             return "RedisValue{type=" + getType() + ", expiry=" + expiryTimeMillis + ", data=" + wrapped.getData() + "}";

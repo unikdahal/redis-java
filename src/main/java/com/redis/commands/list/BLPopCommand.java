@@ -249,6 +249,11 @@ public class BLPopCommand implements ICommand {
         return "BLPOP";
     }
 
+    /**
+     * Indicates that BLPOP modifies the dataset.
+     *
+     * @return `true` if the command modifies the dataset, `false` otherwise
+     */
     @Override
     public boolean isWriteCommand() {
         return true;

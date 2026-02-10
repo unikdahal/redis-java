@@ -62,31 +62,22 @@ public class CommandPropagator {
     );
 
     /**
-     * Determines if a command should be propagated to replicas.
-     * <p>
-     * Only write commands that modify state need to be propagated.
-     * Read commands, transaction control (MULTI/EXEC), and replication
-     * commands (REPLCONF, PSYNC) are not propagated.
+     * Determines whether the given command modifies dataset state and therefore must be propagated to replicas.
      *
-     * @param commandName The uppercase command name
-     * @return true if the command should be propagated to replicas
+     * @param commandName the command name (expected in uppercase)
+     * @return true if the command should be propagated to replicas, false otherwise
      */
     public static boolean shouldPropagate(String commandName) {
         return WRITE_COMMANDS.contains(commandName);
     }
 
     /**
-     * Propagates a command to all connected replicas.
-     * <p>
-     * This method converts the command and arguments to RESP format
-     * and sends to replicas via the ReplicationManager.
-     * <p>
-     * <b>Note:</b> For commands that need rewriting (XADD with *, SET with EX),
-     * use {@link #propagateRewritten(String, List)} instead to ensure
-     * consistent state across replicas.
+     * Propagates the given command and its arguments from the master to all connected replicas.
      *
-     * @param commandName The command name (e.g., "SET", "DEL")
-     * @param args The command arguments (not including command name)
+     * If the current node is not the master, this method performs no action.
+     *
+     * @param commandName the command name (e.g., "SET", "DEL")
+     * @param args        the command arguments (excluding the command name); may contain nulls to represent bulk nils
      */
     public static void propagate(String commandName, List<String> args) {
         ReplicationManager replMgr = ReplicationManager.getInstance();
@@ -101,13 +92,10 @@ public class CommandPropagator {
     }
 
     /**
-     * Propagates a rewritten/canonical command to replicas.
-     * <p>
-     * Use this method when the command has been rewritten to its canonical form
-     * (e.g., XADD with actual ID instead of *, SET with PXAT instead of EX).
+     * Propagates a command already converted to its canonical RESP arguments to replicas.
      *
-     * @param commandName The command name
-     * @param rewrittenArgs The canonical arguments (already normalized)
+     * @param commandName the command name
+     * @param rewrittenArgs canonical, normalized arguments to propagate
      */
     public static void propagateRewritten(String commandName, List<String> rewrittenArgs) {
         propagate(commandName, rewrittenArgs);
@@ -132,18 +120,13 @@ public class CommandPropagator {
     }
 
     /**
-     * Builds a RESP Array from command name and arguments.
-     * <p>
-     * RESP Array format: *{count}\r\n${len}\r\n{element}\r\n...
-     * <p>
-     * Example: SET key value becomes:
-     * <pre>
-     * *3\r\n$3\r\nSET\r\n$3\r\nkey\r\n$5\r\nvalue\r\n
-     * </pre>
+     * Constructs a RESP Array–encoded string representing the given command and its arguments.
      *
-     * @param commandName The command name
-     * @param args The command arguments
-     * @return RESP-encoded array string
+     * Null argument elements are encoded as RESP bulk nil entries.
+     *
+     * @param commandName the command name to encode (e.g., "SET")
+     * @param args the command arguments in order; elements may be null to produce bulk nil
+     * @return a RESP Array-encoded string for the command and arguments
      */
     public static String buildRespArray(String commandName, List<String> args) {
         int totalElements = 1 + args.size(); // command name + args
@@ -170,12 +153,12 @@ public class CommandPropagator {
     }
 
     /**
-     * Appends a bulk string to the StringBuilder.
-     * <p>
-     * Bulk String format: ${length}\r\n{data}\r\n
+     * Appends the given value to the StringBuilder as a RESP Bulk String; encodes null as a Bulk Nil.
      *
-     * @param sb StringBuilder to append to
-     * @param value The string value to encode
+     * The byte length used for the bulk string header is computed from the UTF-8 encoding of {@code value}.
+     *
+     * @param sb the StringBuilder to append to
+     * @param value the string to encode; if {@code null}, a RESP Bulk Nil ({@code $-1\r\n}) is appended
      */
     private static void appendBulkString(StringBuilder sb, String value) {
         if (value == null) {

@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Replication Commands Integration Tests")
 public class ReplicationCommandsIT extends BaseIntegrationTest {
 
+    /**
+     * Reset the global replication state to a clean baseline before each test.
+     */
     @BeforeEach
     void resetReplication() {
         // Ensure we're starting fresh
@@ -64,6 +67,11 @@ public class ReplicationCommandsIT extends BaseIntegrationTest {
             assertTrue(result.contains("used_memory:"));
         }
 
+        /**
+         * Verifies that the server's replication INFO identifies it as the master with no connected replicas.
+         *
+         * Sends an INFO replication request and asserts the response contains `role:master` and `connected_slaves:0`.
+         */
         @Test
         @DisplayName("INFO shows master role by default")
         void testInfoMasterRole() {
@@ -128,6 +136,13 @@ public class ReplicationCommandsIT extends BaseIntegrationTest {
             sendCommand("REPLCONF", "capa", "psync2");
         }
 
+        /**
+         * Verifies that issuing "PSYNC ? -1" triggers a full resynchronization and does not produce an error.
+         *
+         * Sends the PSYNC replica handshake and asserts that the server either reports `FULLRESYNC`,
+         * returns a non-error reply, or yields no direct textual result (embedding channels may not
+         * surface the response).
+         */
         @Test
         @DisplayName("PSYNC ? -1 triggers full resync")
         void testPsyncFullResync() {
@@ -153,6 +168,11 @@ public class ReplicationCommandsIT extends BaseIntegrationTest {
     @DisplayName("WAIT Command")
     class WaitCommandTests {
 
+        /**
+         * Verifies that sending "WAIT 0 0" returns immediately with a RESP integer reply.
+         *
+         * Asserts the response is non-null and starts with ':' (RESP integer prefix).
+         */
         @Test
         @DisplayName("WAIT with 0 replicas returns immediately")
         void testWaitZeroReplicas() {
@@ -199,6 +219,11 @@ public class ReplicationCommandsIT extends BaseIntegrationTest {
             assertTrue(result.startsWith("-"));
         }
 
+        /**
+         * Verifies that the WAIT command returns an error when the timeout is negative.
+         *
+         * Asserts the server response begins with '-' for the invocation WAIT 1 -100.
+         */
         @Test
         @DisplayName("WAIT with negative timeout")
         void testWaitNegativeTimeout() {
@@ -238,6 +263,11 @@ public class ReplicationCommandsIT extends BaseIntegrationTest {
             assertEquals(0, mgr.getMasterReplOffset());
         }
 
+        /**
+         * Verifies the replication manager starts with no connected replicas.
+         *
+         * Asserts that the connected replica count is zero and the replicas collection is empty.
+         */
         @Test
         @DisplayName("No connected replicas initially")
         void testNoReplicasInitially() {
@@ -247,6 +277,12 @@ public class ReplicationCommandsIT extends BaseIntegrationTest {
         }
     }
 
+    /**
+     * Removes test keys from the datastore after each test execution.
+     *
+     * This teardown deletes the keys "key" and "test_key" to ensure a clean state
+     * between tests.
+     */
     @AfterEach
     void cleanup() {
         cleanupKeys("key", "test_key");

@@ -29,16 +29,15 @@ public class ExpireCommand implements ICommand {
     private static final ThreadLocal<Long> lastComputedExpiry = new ThreadLocal<>();
 
     /**
-     * Set a seconds-based expiration timestamp for the specified key.
-     *
-     * Expects {@code args} to contain the key at index 0 and the expiry in seconds at index 1.
-     * Returns the command error reply {@code ERR_WRONG_ARGS} if fewer than two arguments are provided,
-     * or {@code ERR_VALUE} if the expiry value is not a valid integer.
-     *
-     * @param args the command arguments: {@code [key, seconds]}
-     * @param ctx   the Netty channel context (not used by this implementation)
-     * @return {@code ":1\r\n"} if the expiry was set, {@code ":0\r\n"} otherwise
-     */
+         * Set an expiration for the given key using a relative seconds value.
+         *
+         * Expects {@code args} to contain the key at index 0 and the expiry in seconds at index 1.
+         * On successful expiry set, records the computed absolute expiry timestamp (milliseconds since epoch)
+         * in a thread-local for replication rewriting.
+         *
+         * @param args the command arguments: {@code [key, seconds]}
+         * @return {@code ":1\r\n"} if the expiry was set, {@code ":0\r\n"} otherwise
+         */
     @Override
     public String execute(List<String> args, ChannelHandlerContext ctx) {
         lastComputedExpiry.remove();
@@ -76,21 +75,26 @@ public class ExpireCommand implements ICommand {
         return "EXPIRE";
     }
 
+    /**
+     * Indicates this command performs a write operation that modifies the dataset.
+     *
+     * @return `true` if the command modifies the data (is a write), `false` otherwise.
+     */
     @Override
     public boolean isWriteCommand() {
         return true;
     }
 
     /**
-     * Returns canonical arguments for replication.
-     * <p>
-     * Converts EXPIRE (relative seconds) to PEXPIREAT (absolute milliseconds)
-     * to ensure all replicas set the same absolute expiry time.
-     *
-     * @param originalArgs The original arguments [key, seconds]
-     * @param response The response from execute()
-     * @return PEXPIREAT arguments [key, timestamp_ms], or null if failed
-     */
+         * Produce replication arguments by converting EXPIRE's relative seconds into
+         * PEXPIREAT's absolute expiration timestamp in milliseconds.
+         *
+         * <p>Only rewrites when the original command succeeded; otherwise returns null.
+         *
+         * @param originalArgs the original EXPIRE arguments as [key, seconds]
+         * @param response the raw response returned by execute()
+         * @return the replication arguments as [key, timestamp_ms], or null if the command did not succeed or the computed expiry is unavailable
+         */
     @Override
     public List<String> getReplicationArgs(List<String> originalArgs, String response) {
         // Only rewrite if successful
@@ -114,8 +118,9 @@ public class ExpireCommand implements ICommand {
     }
 
     /**
-     * Returns the rewritten command name for replication.
-     * EXPIRE becomes PEXPIREAT for absolute time handling.
+     * Provide the replication command name to use when rewriting EXPIRE for replication.
+     *
+     * @return the replication command name "PEXPIREAT", which represents expiry as an absolute Unix-time-millisecond timestamp
      */
     public String getReplicationCommandName() {
         return "PEXPIREAT";

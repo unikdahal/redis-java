@@ -86,12 +86,12 @@ public class RdbGenerator {
     // ==================== Public API ====================
 
     /**
-     * Generates an empty RDB file for full resync.
-     * <p>
-     * This is used when a replica connects and needs initial data.
-     * For servers with no data, this returns a minimal valid RDB.
+     * Produce a minimal valid RDB file suitable for a full resynchronization when the server has no data.
      *
-     * @return Byte array containing the RDB file
+     * The RDB includes the magic header, version, two auxiliary fields (`redis-ver` and `redis-bits`), an EOF marker,
+     * and an 8-byte zero CRC64 placeholder.
+     *
+     * @return a byte array containing the generated RDB file
      */
     public static byte[] generateEmptyRdb() {
         try {
@@ -132,14 +132,12 @@ public class RdbGenerator {
     }
 
     /**
-     * Gets the RDB file wrapped in RESP bulk string format for transfer.
-     * <p>
-     * Format: $&lt;length&gt;\r\n&lt;rdb-bytes&gt;
-     * <p>
-     * Note: The RDB transfer format does NOT include trailing \r\n after
-     * the RDB data (unlike normal bulk strings).
+     * Wraps the generated RDB bytes with a RESP bulk-string header for transfer.
      *
-     * @return Byte array ready for network transmission
+     * <p>Format: `$&lt;length&gt;\r\n&lt;rdb-bytes&gt;` (no trailing `\r\n` after the RDB data).
+     *
+     * @return the RESP bulk-string representation: a literal-length header (`$<length>\r\n`)
+     *         followed immediately by the RDB bytes, without a trailing CRLF
      */
     public static byte[] getRdbTransferFormat() {
         byte[] rdb = generateEmptyRdb();
@@ -157,11 +155,11 @@ public class RdbGenerator {
     // ==================== Internal Helpers ====================
 
     /**
-     * Writes a length-prefixed string in RDB format.
+     * Writes a string to the output stream prefixed by its length using RDB variable-length encoding.
      *
-     * @param out Output stream
-     * @param s String to write
-     * @throws IOException If write fails
+     * @param out the output stream to write to
+     * @param s the string to write
+     * @throws IOException if an I/O error occurs while writing
      */
     private static void writeString(ByteArrayOutputStream out, String s) throws IOException {
         byte[] bytes = s.getBytes();

@@ -262,20 +262,16 @@ public class RedisDatabase {
     // ==================== Atomic Operations ====================
 
     /**
-     * The "Holy Grail" of Thread-Safe Read-Modify-Write.
-     * <p>
-     * <b>Why use this?</b>
-     * If you want to append a string, you cannot do:
-     * <pre>
-     * val = get(k);
-     * put(k, val + "new");
-     * </pre>
-     * Between the get and put, another thread might have changed the value.
-     * <p>
-     * <b>How it works:</b>
-     * ConcurrentHashMap locks the specific key bucket. It feeds the current value
-     * to your function, and atomically updates the map with your result.
-     * No other thread can touch this key until the function finishes.
+     * Atomically applies a read-modify-write operation to the value stored for a key.
+     *
+     * <p>The provided remapping function is invoked with the current value, or `null` if the key
+     * does not exist or has expired. If the function returns `null`, the key is removed; otherwise
+     * the returned `RedisValue` is stored. When updating an existing entry, its expiry time is
+     * preserved; a newly created value has no expiry.
+     *
+     * @param key the key to update
+     * @param remappingFunction function that accepts the current value (or `null`) and returns the
+     *                          new value to store, or `null` to remove the key
      */
     public void compute(String key, java.util.function.Function<RedisValue, RedisValue> remappingFunction) {
         map.compute(key, (k, existingEntry) -> {
@@ -307,12 +303,12 @@ public class RedisDatabase {
     // ==================== Snapshot Support ====================
 
     /**
-     * Creates a point-in-time snapshot of the database.
-     * <p>
-     * This method is used for RDB generation during full resync.
-     * The returned map is a shallow copy suitable for iteration.
+     * Creates a point-in-time snapshot of all non-expired keys and their values.
      *
-     * @return Map of key to RedisValue with expiry information
+     * The snapshot is a shallow, independent map suitable for iteration and RDB serialization.
+     * Values retain expiry information when an expiry is set.
+     *
+     * @return a map from key to RedisValue containing all non-expired entries; expiry is preserved on values when applicable
      */
     public Map<String, RedisValue> getSnapshot() {
         Map<String, RedisValue> snapshot = new HashMap<>();
@@ -334,11 +330,11 @@ public class RedisDatabase {
     }
 
     /**
-     * Returns all keys in the database (for KEYS command).
-     * <p>
-     * Note: This may include keys that are technically expired but not yet cleaned up.
+     * Provides a collection view of all keys currently stored in the database.
      *
-     * @return Collection of all key names
+     * Note: the returned view may include keys that have expired but have not yet been removed.
+     *
+     * @return a `Collection<String>` view of the current keys; may include keys that are expired but not yet cleaned up
      */
     public Collection<String> keys() {
         return map.keySet();

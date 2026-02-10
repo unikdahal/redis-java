@@ -30,11 +30,21 @@ public class DelCommand implements ICommand {
             .toString();
     }
 
+    /**
+     * Identifier for the DEL command implemented by this class.
+     *
+     * @return the command name "DEL"
+     */
     @Override
     public String name() {
         return "DEL";
     }
 
+    /**
+     * Indicates whether this command performs a write operation on the database.
+     *
+     * @return `true` if the command modifies the database, `false` otherwise.
+     */
     @Override
     public boolean isWriteCommand() {
         return true;

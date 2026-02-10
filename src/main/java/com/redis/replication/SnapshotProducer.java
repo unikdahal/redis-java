@@ -80,6 +80,15 @@ public class SnapshotProducer {
     private static volatile SnapshotProducer INSTANCE;
     private static final Object INIT_LOCK = new Object();
 
+    /**
+     * Initializes a new SnapshotProducer instance by creating and setting default atomic state fields.
+     *
+     * The following fields are initialized:
+     * - inProgress: false
+     * - baselineOffset: 0
+     * - lastSnapshotTime: 0
+     * - snapshotCount: 0
+     */
     private SnapshotProducer() {
         this.inProgress = new AtomicBoolean(false);
         this.baselineOffset = new AtomicLong(0);
@@ -87,6 +96,11 @@ public class SnapshotProducer {
         this.snapshotCount = new AtomicLong(0);
     }
 
+    /**
+     * Retrieve the singleton SnapshotProducer instance, creating it lazily in a thread-safe manner.
+     *
+     * @return the singleton SnapshotProducer instance
+     */
     public static SnapshotProducer getInstance() {
         SnapshotProducer instance = INSTANCE;
         if (instance == null) {
@@ -137,9 +151,9 @@ public class SnapshotProducer {
     }
 
     /**
-     * Generates an empty RDB file for replicas connecting to an empty master.
+     * Create a minimal RDB file representing an empty dataset.
      *
-     * @return Empty RDB file bytes
+     * @return the bytes of a minimal RDB file suitable for replica synchronization (contains header, auxiliary fields, EOF opcode, and an 8-byte CRC64 placeholder)
      */
     public byte[] generateEmptySnapshot() {
         try {
@@ -187,7 +201,14 @@ public class SnapshotProducer {
     // ==================== Internal RDB Generation ====================
 
     /**
-     * Creates the actual RDB snapshot from database state.
+     * Builds a Redis RDB-format snapshot representing the current in-memory database state.
+     *
+     * The returned byte array is a complete RDB file containing header and auxiliary fields,
+     * a SELECTDB opcode for database 0, a database size hint, serialized key-value entries
+     * (including expiry timestamps when present), an EOF opcode, and an 8-byte CRC64 placeholder.
+     *
+     * @return a byte array containing the serialized RDB snapshot
+     * @throws RuntimeException if snapshot serialization fails
      */
     private byte[] createRdbSnapshot() {
         try {
@@ -276,7 +297,15 @@ public class SnapshotProducer {
         }
     }
 
-    // ==================== RDB Encoding Helpers ====================
+    /**
+     * Writes an AUX field entry to the RDB output stream: emits the AUX opcode followed by the
+     * provided key and value encoded as RDB strings.
+     *
+     * @param out   the output stream to write the AUX entry to
+     * @param key   the auxiliary field name
+     * @param value the auxiliary field value
+     * @throws IOException if an I/O error occurs while writing to the stream
+     */
 
     private void writeAuxField(ByteArrayOutputStream out, String key, String value) throws IOException {
         out.write(RDB_OPCODE_AUX);
@@ -284,12 +313,33 @@ public class SnapshotProducer {
         writeString(out, value);
     }
 
+    /**
+     * Writes a UTF-8 encoded string to the given output stream, preceded by its Redis RDB length encoding.
+     *
+     * @param out the target ByteArrayOutputStream to write the length prefix and UTF-8 bytes into
+     * @param s   the string to encode and write
+     * @throws IOException if an I/O error occurs while writing to the stream
+     */
     private void writeString(ByteArrayOutputStream out, String s) throws IOException {
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         writeLength(out, bytes.length);
         out.write(bytes);
     }
 
+    /**
+     * Encodes an integer using Redis RDB length encoding and writes the resulting bytes to the output stream.
+     *
+     * <p>Encoding forms:
+     * <ul>
+     *   <li>0 <= length &lt; 64: single byte containing the length.</li>
+     *   <li>64 <= length &lt; 16384: two bytes with 0x40 prefix in the first byte followed by the low 8 bits.</li>
+     *   <li>length >= 16384: marker byte 0x80 followed by a 4-byte big-endian length.</li>
+     * </ul>
+     *
+     * @param out the output stream to write encoded length bytes to
+     * @param length the integer length to encode
+     * @throws IOException if an I/O error occurs while writing to the stream
+     */
     private void writeLength(ByteArrayOutputStream out, int length) throws IOException {
         if (length < 64) {
             out.write(length);
@@ -305,6 +355,13 @@ public class SnapshotProducer {
         }
     }
 
+    /**
+     * Writes the given long as an 8-byte little-endian integer to the provided output stream.
+     *
+     * @param out   the stream to write the bytes to
+     * @param value the long value to encode
+     * @throws IOException if an I/O error occurs while writing to the stream
+     */
     private void writeLongLE(ByteArrayOutputStream out, long value) throws IOException {
         // Little-endian 8-byte integer
         for (int i = 0; i < 8; i++) {
@@ -313,25 +370,48 @@ public class SnapshotProducer {
         }
     }
 
-    // ==================== State Accessors ====================
+    /**
+     * Indicates whether a snapshot is currently being produced.
+     *
+     * @return `true` if a snapshot is in progress, `false` otherwise.
+     */
 
     public boolean isInProgress() {
         return inProgress.get();
     }
 
+    /**
+     * Replication offset recorded when the most recent snapshot generation began.
+     *
+     * @return the baseline replication offset captured at snapshot start
+     */
     public long getBaselineOffset() {
         return baselineOffset.get();
     }
 
+    /**
+     * Returns the timestamp when the most recent snapshot was produced.
+     *
+     * @return the last snapshot time in milliseconds since the Unix epoch, or 0 if no snapshot has been produced yet
+     */
     public long getLastSnapshotTime() {
         return lastSnapshotTime.get();
     }
 
+    /**
+     * The total number of snapshots produced by this SnapshotProducer.
+     *
+     * @return the total number of snapshots produced
+     */
     public long getSnapshotCount() {
         return snapshotCount.get();
     }
 
-    // ==================== Reset (Testing) ====================
+    /**
+     * Reset the SnapshotProducer singleton, clearing the cached instance so a new instance will be created on the next call to getInstance().
+     *
+     * This operation acquires the initialization lock to perform the reset in a thread-safe manner (intended for use in tests).
+     */
 
     public static void reset() {
         synchronized (INIT_LOCK) {
