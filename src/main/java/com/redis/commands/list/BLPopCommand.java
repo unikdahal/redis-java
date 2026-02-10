@@ -253,4 +253,17 @@ public class BLPopCommand implements ICommand {
     public boolean isWriteCommand() {
         return true;
     }
+
+    /**
+     * Returns the non-blocking command name for replication.
+     * <p>
+     * BLPOP is a blocking command that should be replicated as LPOP
+     * to ensure deterministic behavior on replicas.
+     *
+     * @return "LPOP" for replica-safe non-blocking operation
+     */
+    @Override
+    public String getReplicationCommandName() {
+        return "LPOP";
+    }
 }

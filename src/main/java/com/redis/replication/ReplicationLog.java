@@ -161,6 +161,9 @@ public class ReplicationLog {
                 long newOffset = globalOffset.addAndGet(data.length);
                 firstAvailableOffset.set(newOffset - bufferSize);
                 evictionCount.incrementAndGet();
+                totalBytesWritten.addAndGet(data.length);
+                // Return early to avoid the second addAndGet below
+                return newOffset;
             } else if (startIdx + data.length <= bufferSize) {
                 // No wraparound needed
                 System.arraycopy(data, 0, buffer, startIdx, data.length);
@@ -173,7 +176,7 @@ public class ReplicationLog {
                 writePosition += data.length;
             }
 
-            // Update global offset
+            // Update global offset (only reached for normal-sized data)
             long newOffset = globalOffset.addAndGet(data.length);
 
             // Update first available offset if we've wrapped

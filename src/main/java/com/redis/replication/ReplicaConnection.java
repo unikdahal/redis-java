@@ -164,7 +164,7 @@ public class ReplicaConnection {
      * <p><b>Performance Notes:</b>
      * <ul>
      *   <li>Uses Unpooled.wrappedBuffer for zero-copy</li>
-     *   <li>Updates expectedOffset before write (conservative)</li>
+     *   <li>Updates expectedOffset AFTER successful write to avoid inflated replication lag</li>
      *   <li>Non-blocking write via Netty's event loop</li>
      * </ul>
      *
@@ -177,12 +177,20 @@ public class ReplicaConnection {
             return false;
         }
 
-        // Update expected offset BEFORE sending (conservative tracking)
-        expectedOffset.addAndGet(respCommand.length);
-
         // Zero-copy wrap and write
         ByteBuf buf = Unpooled.wrappedBuffer(respCommand);
-        channel.writeAndFlush(buf);
+        final int commandLength = respCommand.length;
+
+        // Update expected offset only AFTER successful write to avoid inflated lag
+        channel.writeAndFlush(buf).addListener(future -> {
+            if (future.isSuccess()) {
+                expectedOffset.addAndGet(commandLength);
+            } else {
+                // Log write failure for monitoring
+                System.err.println("[Replication] Failed to propagate command to replica " +
+                    host + ":" + port + ": " + future.cause());
+            }
+        });
 
         return true;
     }

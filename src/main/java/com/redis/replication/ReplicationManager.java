@@ -472,6 +472,13 @@ public class ReplicationManager {
     /**
      * Waits for replicas to acknowledge with adaptive exponential backoff.
      * More efficient than Redis's fixed polling interval.
+     * <p>
+     * <b>Note:</b> This method blocks and should NOT be called from Netty's event loop.
+     * Use WaitCommand's async offloading mechanism.
+     *
+     * @param numReplicas Minimum number of replicas to wait for
+     * @param timeoutMs Timeout in milliseconds. 0 means wait forever.
+     * @return Number of replicas that acknowledged within the timeout
      */
     public int waitForReplicas(int numReplicas, long timeoutMs) {
         if (!isMaster() || replicas.isEmpty()) {
@@ -485,7 +492,8 @@ public class ReplicationManager {
 
         requestAckFromReplicas();
 
-        long deadline = System.currentTimeMillis() + timeoutMs;
+        // timeoutMs == 0 means wait forever (use Long.MAX_VALUE as deadline)
+        long deadline = (timeoutMs == 0) ? Long.MAX_VALUE : System.currentTimeMillis() + timeoutMs;
         long pollInterval = INITIAL_WAIT_POLL_INTERVAL_MS;
 
         while (System.currentTimeMillis() < deadline) {
@@ -498,7 +506,11 @@ public class ReplicationManager {
             if (remaining <= 0) break;
 
             try {
-                Thread.sleep(Math.min(pollInterval, Math.min(remaining, MAX_WAIT_POLL_INTERVAL_MS)));
+                // Cap sleep time for infinite timeout to allow periodic checks
+                long sleepTime = (timeoutMs == 0)
+                    ? Math.min(pollInterval, MAX_WAIT_POLL_INTERVAL_MS)
+                    : Math.min(pollInterval, Math.min(remaining, MAX_WAIT_POLL_INTERVAL_MS));
+                Thread.sleep(sleepTime);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

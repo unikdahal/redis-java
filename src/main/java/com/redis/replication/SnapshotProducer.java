@@ -59,6 +59,9 @@ public class SnapshotProducer {
     // RDB Value Types
     private static final byte RDB_TYPE_STRING = 0;
     private static final byte RDB_TYPE_LIST = 1;
+    private static final byte RDB_TYPE_SET = 2;
+    private static final byte RDB_TYPE_ZSET = 3;
+    private static final byte RDB_TYPE_HASH = 4;
     private static final byte RDB_TYPE_STREAM = 15;
 
     // ==================== State ====================
@@ -250,6 +253,41 @@ public class SnapshotProducer {
                         }
                         break;
 
+                    case SET:
+                        out.write(RDB_TYPE_SET);
+                        writeString(out, key);
+                        @SuppressWarnings("unchecked")
+                        java.util.Set<String> set = (java.util.Set<String>) value.getData();
+                        writeLength(out, set.size());
+                        for (String member : set) {
+                            writeString(out, member);
+                        }
+                        break;
+
+                    case HASH:
+                        out.write(RDB_TYPE_HASH);
+                        writeString(out, key);
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, String> hash = (java.util.Map<String, String>) value.getData();
+                        writeLength(out, hash.size());
+                        for (java.util.Map.Entry<String, String> hashEntry : hash.entrySet()) {
+                            writeString(out, hashEntry.getKey());
+                            writeString(out, hashEntry.getValue());
+                        }
+                        break;
+
+                    case SORTED_SET:
+                        out.write(RDB_TYPE_ZSET);
+                        writeString(out, key);
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Double> zset = (java.util.Map<String, Double>) value.getData();
+                        writeLength(out, zset.size());
+                        for (java.util.Map.Entry<String, Double> zEntry : zset.entrySet()) {
+                            writeString(out, zEntry.getKey());
+                            writeString(out, String.valueOf(zEntry.getValue()));
+                        }
+                        break;
+
                     case STREAM:
                         // Streams are complex; simplified for now
                         out.write(RDB_TYPE_STREAM);
@@ -260,6 +298,7 @@ public class SnapshotProducer {
 
                     default:
                         // Skip unknown types
+                        System.err.println("[SnapshotProducer] Skipping unknown type for key: " + key);
                         break;
                 }
             }

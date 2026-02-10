@@ -178,6 +178,7 @@ Non-deterministic commands are rewritten before replication:
 - `XADD stream * field value` → `XADD stream <actual-id> field value`
 - `SET key value EX 60` → `SET key value PXAT <timestamp>`
 - `EXPIRE key 60` → `PEXPIREAT key <timestamp>`
+- `BLPOP key timeout` → `LPOP key` (blocking converted to non-blocking)
 
 **Full Sync vs Partial Sync Decision:**
 ```
@@ -189,6 +190,13 @@ No heuristics. No guessing. The decision is deterministic.
 
 **Write Protection on Replicas:**
 Replicas automatically reject write commands with `-READONLY` error. This is enforced in `RedisCommandHandler`.
+
+**WAIT Command Implementation:**
+The WAIT command blocks until replicas acknowledge the current offset:
+- `timeout=0` means wait forever (infinite wait)
+- Uses a dedicated thread pool to avoid blocking Netty's event loop
+- Implements adaptive exponential backoff for efficient polling
+- Returns async response via `CompletableFuture`
 
 ## Key Development Guidelines
 

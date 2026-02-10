@@ -128,20 +128,21 @@ start_replica() {
 
 # Send command using redis-cli or netcat
 send_command() {
-    local port=$1
+    local port="$1"
     shift
-    local cmd="$@"
+    # Capture remaining args as an array to preserve arguments with spaces
+    local args=("$@")
 
     if [ "$USE_REDIS_CLI" = true ]; then
-        redis-cli -p $port $cmd 2>/dev/null
+        redis-cli -p "$port" "${args[@]}" 2>/dev/null
     else
-        # Build RESP command
-        local args=($cmd)
+        # Build RESP command preserving argument boundaries
         local resp="*${#args[@]}\r\n"
         for arg in "${args[@]}"; do
-            resp+='$'"${#arg}\r\n${arg}\r\n"
+            local len=${#arg}
+            resp+="\$${len}\r\n${arg}\r\n"
         done
-        echo -e "$resp" | nc -q 1 localhost $port 2>/dev/null | tr -d '\r'
+        echo -e "$resp" | nc -q 1 localhost "$port" 2>/dev/null | tr -d '\r'
     fi
 }
 
@@ -200,7 +201,7 @@ test_multiple_keys() {
     for i in $(seq 1 $count); do
         local value=$(send_command $REPLICA1_PORT GET "key$i")
         if [[ "$value" == *"value$i"* ]]; then
-            ((success++))
+            success=$((success + 1))
         fi
     done
 
@@ -304,7 +305,7 @@ stress_test() {
     for i in $(seq 1 100 $count); do
         local value=$(send_command $REPLICA1_PORT GET "stress$i")
         if [[ "$value" == *"v$i"* ]]; then
-            ((verified++))
+            verified=$((verified + 1))
         fi
     done
 
@@ -330,7 +331,7 @@ scale_test() {
         local value=$(send_command $port GET scalekey)
         if [[ "$value" == *"replicated_to_all"* ]]; then
             log_success "Replica on port $port has the key"
-            ((success++))
+            success=$((success + 1))
         else
             log_error "Replica on port $port missing key"
         fi
@@ -364,20 +365,20 @@ main() {
     # Run tests
     local failed=0
 
-    test_basic_replication || ((failed++))
-    test_write_protection || ((failed++))
-    test_multiple_keys || ((failed++))
-    test_info_replication || ((failed++))
-    test_list_replication || ((failed++))
-    test_stream_replication || ((failed++))
+    test_basic_replication || failed=$((failed + 1))
+    test_write_protection || failed=$((failed + 1))
+    test_multiple_keys || failed=$((failed + 1))
+    test_info_replication || failed=$((failed + 1))
+    test_list_replication || failed=$((failed + 1))
+    test_stream_replication || failed=$((failed + 1))
 
     # Optional tests based on flags
     if [[ "$1" == "--stress" ]] || [[ "$1" == "--scale" ]]; then
-        stress_test || ((failed++))
+        stress_test || failed=$((failed + 1))
     fi
 
     if [[ "$1" == "--scale" ]]; then
-        scale_test || ((failed++))
+        scale_test || failed=$((failed + 1))
     fi
 
     # Summary

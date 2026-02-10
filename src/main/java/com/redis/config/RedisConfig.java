@@ -109,7 +109,11 @@ public class RedisConfig {
         }
         String envPort = System.getenv("REDIS_PORT");
         if (envPort != null) {
-            return Integer.parseInt(envPort);
+            try {
+                return Integer.parseInt(envPort);
+            } catch (NumberFormatException e) {
+                System.err.println("[RedisConfig] Warning: Invalid REDIS_PORT value '" + envPort + "', using default");
+            }
         }
         return Integer.parseInt(properties.getProperty("redis.port", String.valueOf(DEFAULT_PORT)));
     }
@@ -117,7 +121,11 @@ public class RedisConfig {
     public int getBossThreads() {
         String envThreads = System.getenv("REDIS_BOSS_THREADS");
         if (envThreads != null) {
-            return Integer.parseInt(envThreads);
+            try {
+                return Integer.parseInt(envThreads);
+            } catch (NumberFormatException e) {
+                System.err.println("[RedisConfig] Warning: Invalid REDIS_BOSS_THREADS value '" + envThreads + "', using default");
+            }
         }
         return Integer.parseInt(properties.getProperty("redis.boss.threads", String.valueOf(DEFAULT_BOSS_THREADS)));
     }
@@ -125,7 +133,11 @@ public class RedisConfig {
     public int getWorkerThreads() {
         String envThreads = System.getenv("REDIS_WORKER_THREADS");
         if (envThreads != null) {
-            return Integer.parseInt(envThreads);
+            try {
+                return Integer.parseInt(envThreads);
+            } catch (NumberFormatException e) {
+                System.err.println("[RedisConfig] Warning: Invalid REDIS_WORKER_THREADS value '" + envThreads + "', using default");
+            }
         }
         return Integer.parseInt(properties.getProperty("redis.worker.threads", String.valueOf(DEFAULT_WORKER_THREADS)));
     }
@@ -133,7 +145,11 @@ public class RedisConfig {
     public int getCleanupIntervalMs() {
         String envInterval = System.getenv("REDIS_CLEANUP_INTERVAL_MS");
         if (envInterval != null) {
-            return Integer.parseInt(envInterval);
+            try {
+                return Integer.parseInt(envInterval);
+            } catch (NumberFormatException e) {
+                System.err.println("[RedisConfig] Warning: Invalid REDIS_CLEANUP_INTERVAL_MS value '" + envInterval + "', using default");
+            }
         }
         return Integer.parseInt(properties.getProperty("redis.cleanup.interval.ms", String.valueOf(DEFAULT_CLEANUP_INTERVAL_MS)));
     }

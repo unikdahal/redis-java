@@ -5,7 +5,7 @@ import com.redis.config.RedisConfig;
 import com.redis.replication.ReplicationManager;
 import io.netty.channel.ChannelHandlerContext;
 
-import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -55,7 +55,9 @@ public class InfoCommand implements ICommand {
 
         String content = info.toString();
         // Redis Bulk String format: $[len]\r\n[data]\r\n
-        return "$" + content.length() + "\r\n" + content + "\r\n";
+        // Use byte length for proper RESP encoding (handles multi-byte UTF-8 chars)
+        byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+        return "$" + contentBytes.length + "\r\n" + content + "\r\n";
     }
 
     private void appendServerInfo(StringBuilder sb) {

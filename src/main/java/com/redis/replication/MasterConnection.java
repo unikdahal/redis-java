@@ -1,6 +1,7 @@
 package com.redis.replication;
 
 import com.redis.storage.RedisDatabase;
+import com.redis.storage.RedisValue;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -218,17 +219,39 @@ public class MasterConnection {
 
     /**
      * Sends a RESP-formatted command to the master.
+     * Uses UTF-8 byte length for proper RESP encoding.
      *
      * @param args Command name followed by arguments
      */
     private void sendCommand(String... args) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("*").append(args.length).append("\r\n");
-        for (String arg : args) {
-            sb.append("$").append(arg.length()).append("\r\n").append(arg).append("\r\n");
+        // Build RESP array header
+        StringBuilder header = new StringBuilder();
+        header.append("*").append(args.length).append("\r\n");
+
+        // Pre-compute byte arrays for each argument
+        byte[][] argBytes = new byte[args.length][];
+        for (int i = 0; i < args.length; i++) {
+            argBytes[i] = args[i].getBytes(StandardCharsets.UTF_8);
         }
 
-        ByteBuf buf = Unpooled.copiedBuffer(sb.toString(), StandardCharsets.UTF_8);
+        // Calculate total buffer size
+        int totalSize = header.length();
+        for (byte[] argByte : argBytes) {
+            // $<len>\r\n<data>\r\n
+            totalSize += 1 + String.valueOf(argByte.length).length() + 2 + argByte.length + 2;
+        }
+
+        ByteBuf buf = Unpooled.buffer(totalSize);
+        buf.writeBytes(header.toString().getBytes(StandardCharsets.UTF_8));
+
+        for (byte[] argByte : argBytes) {
+            buf.writeByte('$');
+            buf.writeBytes(String.valueOf(argByte.length).getBytes(StandardCharsets.UTF_8));
+            buf.writeBytes("\r\n".getBytes(StandardCharsets.UTF_8));
+            buf.writeBytes(argByte);
+            buf.writeBytes("\r\n".getBytes(StandardCharsets.UTF_8));
+        }
+
         channel.writeAndFlush(buf);
     }
 
@@ -247,16 +270,18 @@ public class MasterConnection {
         @Override
         protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
             while (in.readableBytes() > 0) {
-                in.markReaderIndex();
-
-                // Special handling for RDB data
+                // Special handling for RDB data - do NOT mark/reset here
+                // as RDB bytes are consumed progressively by handleRdbData
                 if (loadingRdb) {
                     if (!handleRdbData(in)) {
-                        in.resetReaderIndex();
+                        // Not enough data yet, wait for more
                         return;
                     }
                     continue;
                 }
+
+                // Mark before RESP parsing - only reset if RESP parse is incomplete
+                in.markReaderIndex();
 
                 // Parse RESP response
                 argsBuffer.clear();
@@ -542,8 +567,13 @@ public class MasterConnection {
         /**
          * Executes a replicated write command on the local database.
          * <p>
-         * This is a simplified implementation. A production version
-         * would use the command registry for consistency.
+         * Handles both original and canonicalized command forms from master.
+         * Canonicalized forms include:
+         * <ul>
+         *   <li>SET key value PXAT timestamp (absolute expiry)</li>
+         *   <li>PEXPIREAT key timestamp</li>
+         *   <li>LPOP key (from BLPOP)</li>
+         * </ul>
          */
         private void executeReplicatedCommand(List<String> command) {
             if (command.isEmpty()) return;
@@ -551,38 +581,329 @@ public class MasterConnection {
             String cmdName = command.get(0).toUpperCase();
             RedisDatabase db = RedisDatabase.getInstance();
 
-            switch (cmdName) {
-                case "SET" -> {
-                    if (command.size() >= 3) {
-                        String key = command.get(1);
-                        String value = command.get(2);
-                        // Handle expiry options
-                        if (command.size() >= 5 && "PX".equalsIgnoreCase(command.get(3))) {
-                            long px = Long.parseLong(command.get(4));
-                            db.put(key, value, px);
-                        } else if (command.size() >= 5 && "EX".equalsIgnoreCase(command.get(3))) {
-                            long ex = Long.parseLong(command.get(4)) * 1000;
-                            db.put(key, value, ex);
-                        } else {
-                            db.put(key, value);
-                        }
+            try {
+                switch (cmdName) {
+                    case "SET" -> handleSetCommand(command, db);
+                    case "DEL" -> handleDelCommand(command, db);
+                    case "INCR" -> handleIncrCommand(command, db);
+                    case "LPUSH" -> handleLPushCommand(command, db);
+                    case "RPUSH" -> handleRPushCommand(command, db);
+                    case "LPOP" -> handleLPopCommand(command, db);
+                    case "RPOP" -> handleRPopCommand(command, db);
+                    case "EXPIRE" -> handleExpireCommand(command, db);
+                    case "PEXPIRE" -> handlePExpireCommand(command, db);
+                    case "EXPIREAT" -> handleExpireAtCommand(command, db);
+                    case "PEXPIREAT" -> handlePExpireAtCommand(command, db);
+                    case "XADD" -> handleXAddCommand(command, db);
+                    case "HSET" -> handleHSetCommand(command, db);
+                    case "SADD" -> handleSAddCommand(command, db);
+                    case "ZADD" -> handleZAddCommand(command, db);
+                    default -> {
+                        // Log unrecognized commands for debugging divergence
+                        System.err.println("[Replication] Unrecognized replicated command: " + cmdName +
+                            " (args: " + command.subList(1, Math.min(command.size(), 4)) + ")");
                     }
                 }
-                case "DEL" -> {
-                    for (int i = 1; i < command.size(); i++) {
-                        db.remove(command.get(i));
-                    }
-                }
-                case "INCR" -> {
-                    if (command.size() >= 2) {
-                        String key = command.get(1);
-                        String current = db.get(key);
-                        long val = current == null ? 0 : Long.parseLong(current);
-                        db.put(key, String.valueOf(val + 1));
-                    }
-                }
-                // Additional commands can be added here
+            } catch (Exception e) {
+                System.err.println("[Replication] Error executing replicated command " + cmdName + ": " + e.getMessage());
             }
+        }
+
+        private void handleSetCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 3) return;
+            String key = command.get(1);
+            String value = command.get(2);
+
+            // Handle canonicalized PXAT form (absolute millisecond timestamp)
+            if (command.size() >= 5 && "PXAT".equalsIgnoreCase(command.get(3))) {
+                try {
+                    long absTimeMs = Long.parseLong(command.get(4));
+                    long ttlMs = absTimeMs - System.currentTimeMillis();
+                    if (ttlMs > 0) {
+                        db.put(key, value, ttlMs);
+                    } else {
+                        // Already expired, don't store
+                        db.remove(key);
+                    }
+                } catch (NumberFormatException e) {
+                    db.put(key, value);
+                }
+            } else if (command.size() >= 5 && "PX".equalsIgnoreCase(command.get(3))) {
+                try {
+                    long px = Long.parseLong(command.get(4));
+                    db.put(key, value, px);
+                } catch (NumberFormatException e) {
+                    db.put(key, value);
+                }
+            } else if (command.size() >= 5 && "EX".equalsIgnoreCase(command.get(3))) {
+                try {
+                    long ex = Long.parseLong(command.get(4)) * 1000;
+                    db.put(key, value, ex);
+                } catch (NumberFormatException e) {
+                    db.put(key, value);
+                }
+            } else if (command.size() >= 5 && "EXAT".equalsIgnoreCase(command.get(3))) {
+                try {
+                    long absTimeSec = Long.parseLong(command.get(4));
+                    long ttlMs = (absTimeSec * 1000) - System.currentTimeMillis();
+                    if (ttlMs > 0) {
+                        db.put(key, value, ttlMs);
+                    } else {
+                        db.remove(key);
+                    }
+                } catch (NumberFormatException e) {
+                    db.put(key, value);
+                }
+            } else {
+                db.put(key, value);
+            }
+        }
+
+        private void handleDelCommand(List<String> command, RedisDatabase db) {
+            for (int i = 1; i < command.size(); i++) {
+                db.remove(command.get(i));
+            }
+        }
+
+        private void handleIncrCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 2) return;
+            String key = command.get(1);
+            String current = db.get(key);
+            try {
+                long val = (current == null || current.isEmpty()) ? 0 : Long.parseLong(current);
+                db.put(key, String.valueOf(val + 1));
+            } catch (NumberFormatException e) {
+                // Non-numeric value: Redis would error, but for replication consistency
+                // we log and skip (master already validated)
+                System.err.println("[Replication] INCR on non-numeric value for key: " + key);
+            }
+        }
+
+        private void handleLPushCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 3) return;
+            String key = command.get(1);
+            db.compute(key, existing -> {
+                java.util.LinkedList<String> list;
+                if (existing == null) {
+                    list = new java.util.LinkedList<>();
+                } else if (existing.getType() != RedisValue.Type.LIST) {
+                    return existing;
+                } else {
+                    @SuppressWarnings("unchecked")
+                    java.util.List<String> existingList = (java.util.List<String>) existing.getData();
+                    list = new java.util.LinkedList<>(existingList);
+                }
+                for (int i = 2; i < command.size(); i++) {
+                    list.addFirst(command.get(i));
+                }
+                return RedisValue.list(list);
+            });
+        }
+
+        private void handleRPushCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 3) return;
+            String key = command.get(1);
+            db.compute(key, existing -> {
+                java.util.LinkedList<String> list;
+                if (existing == null) {
+                    list = new java.util.LinkedList<>();
+                } else if (existing.getType() != RedisValue.Type.LIST) {
+                    return existing;
+                } else {
+                    @SuppressWarnings("unchecked")
+                    java.util.List<String> existingList = (java.util.List<String>) existing.getData();
+                    list = new java.util.LinkedList<>(existingList);
+                }
+                for (int i = 2; i < command.size(); i++) {
+                    list.addLast(command.get(i));
+                }
+                return RedisValue.list(list);
+            });
+        }
+
+        private void handleLPopCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 2) return;
+            String key = command.get(1);
+            db.compute(key, existing -> {
+                if (existing == null || existing.getType() != RedisValue.Type.LIST) {
+                    return existing;
+                }
+                @SuppressWarnings("unchecked")
+                java.util.List<String> existingList = (java.util.List<String>) existing.getData();
+                if (existingList.isEmpty()) {
+                    return existing;
+                }
+                java.util.LinkedList<String> list = new java.util.LinkedList<>(existingList);
+                list.removeFirst();
+                return list.isEmpty() ? null : RedisValue.list(list);
+            });
+        }
+
+        private void handleRPopCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 2) return;
+            String key = command.get(1);
+            db.compute(key, existing -> {
+                if (existing == null || existing.getType() != RedisValue.Type.LIST) {
+                    return existing;
+                }
+                @SuppressWarnings("unchecked")
+                java.util.List<String> existingList = (java.util.List<String>) existing.getData();
+                if (existingList.isEmpty()) {
+                    return existing;
+                }
+                java.util.LinkedList<String> list = new java.util.LinkedList<>(existingList);
+                list.removeLast();
+                return list.isEmpty() ? null : RedisValue.list(list);
+            });
+        }
+
+        private void handleExpireCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 3) return;
+            try {
+                String key = command.get(1);
+                long seconds = Long.parseLong(command.get(2));
+                db.setExpiryTime(key, System.currentTimeMillis() + (seconds * 1000));
+            } catch (NumberFormatException ignored) {}
+        }
+
+        private void handlePExpireCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 3) return;
+            try {
+                String key = command.get(1);
+                long ms = Long.parseLong(command.get(2));
+                db.setExpiryTime(key, System.currentTimeMillis() + ms);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        private void handleExpireAtCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 3) return;
+            try {
+                String key = command.get(1);
+                long absTimeSec = Long.parseLong(command.get(2));
+                db.setExpiryTime(key, absTimeSec * 1000);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        private void handlePExpireAtCommand(List<String> command, RedisDatabase db) {
+            if (command.size() < 3) return;
+            try {
+                String key = command.get(1);
+                long absTimeMs = Long.parseLong(command.get(2));
+                db.setExpiryTime(key, absTimeMs);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        private void handleXAddCommand(List<String> command, RedisDatabase db) {
+            // XADD stream id field value [field value ...]
+            if (command.size() < 5) return;
+            String streamKey = command.get(1);
+            String idStr = command.get(2);
+
+            // Parse stream ID
+            com.redis.util.StreamId streamId;
+            try {
+                streamId = com.redis.util.StreamId.parse(idStr);
+            } catch (Exception e) {
+                System.err.println("[Replication] Invalid stream ID in XADD: " + idStr);
+                return;
+            }
+
+            // Collect field-value pairs
+            java.util.Map<String, String> fields = new java.util.LinkedHashMap<>();
+            for (int i = 3; i + 1 < command.size(); i += 2) {
+                fields.put(command.get(i), command.get(i + 1));
+            }
+
+            db.compute(streamKey, existing -> {
+                java.util.Map<com.redis.util.StreamId, java.util.Map<String, String>> stream;
+                if (existing == null) {
+                    stream = new java.util.concurrent.ConcurrentSkipListMap<>();
+                } else if (existing.getType() != RedisValue.Type.STREAM) {
+                    return existing;
+                } else {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<com.redis.util.StreamId, java.util.Map<String, String>> existingStream =
+                        (java.util.Map<com.redis.util.StreamId, java.util.Map<String, String>>) existing.getData();
+                    stream = new java.util.concurrent.ConcurrentSkipListMap<>(existingStream);
+                }
+
+                stream.put(streamId, fields);
+
+                return RedisValue.stream(stream);
+            });
+        }
+
+        private void handleHSetCommand(List<String> command, RedisDatabase db) {
+            // HSET key field value [field value ...]
+            if (command.size() < 4) return;
+            String key = command.get(1);
+
+            db.compute(key, existing -> {
+                java.util.Map<String, String> hash;
+                if (existing == null) {
+                    hash = new java.util.HashMap<>();
+                } else if (existing.getType() != RedisValue.Type.HASH) {
+                    return existing;
+                } else {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, String> existingHash = (java.util.Map<String, String>) existing.getData();
+                    hash = new java.util.HashMap<>(existingHash);
+                }
+                for (int i = 2; i + 1 < command.size(); i += 2) {
+                    hash.put(command.get(i), command.get(i + 1));
+                }
+                return RedisValue.hash(hash);
+            });
+        }
+
+        private void handleSAddCommand(List<String> command, RedisDatabase db) {
+            // SADD key member [member ...]
+            if (command.size() < 3) return;
+            String key = command.get(1);
+
+            db.compute(key, existing -> {
+                java.util.Set<String> set;
+                if (existing == null) {
+                    set = new java.util.HashSet<>();
+                } else if (existing.getType() != RedisValue.Type.SET) {
+                    return existing;
+                } else {
+                    @SuppressWarnings("unchecked")
+                    java.util.Set<String> existingSet = (java.util.Set<String>) existing.getData();
+                    set = new java.util.HashSet<>(existingSet);
+                }
+                for (int i = 2; i < command.size(); i++) {
+                    set.add(command.get(i));
+                }
+                return RedisValue.set(set);
+            });
+        }
+
+        private void handleZAddCommand(List<String> command, RedisDatabase db) {
+            // ZADD key score member [score member ...]
+            if (command.size() < 4) return;
+            String key = command.get(1);
+
+            db.compute(key, existing -> {
+                java.util.Map<String, Double> zset;
+                if (existing == null) {
+                    zset = new java.util.LinkedHashMap<>();
+                } else if (existing.getType() != RedisValue.Type.SORTED_SET) {
+                    return existing;
+                } else {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, Double> existingZset = (java.util.Map<String, Double>) existing.getData();
+                    zset = new java.util.LinkedHashMap<>(existingZset);
+                }
+                for (int i = 2; i + 1 < command.size(); i += 2) {
+                    try {
+                        double score = Double.parseDouble(command.get(i));
+                        String member = command.get(i + 1);
+                        zset.put(member, score);
+                    } catch (NumberFormatException ignored) {}
+                }
+                return RedisValue.sortedSet(zset);
+            });
         }
 
         // ==================== Error Handling ====================
