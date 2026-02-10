@@ -31,6 +31,9 @@ JAR_PATH="target/redis-server.jar"
 LOG_DIR="logs"
 JAVA_OPTS="--enable-preview -Xms256m -Xmx512m"
 
+# Track PIDs of processes started by this script
+PIDS=()
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -38,10 +41,18 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Cleanup function
+# Cleanup function - only kills processes started by this script
 cleanup() {
     echo -e "\n${YELLOW}Cleaning up...${NC}"
-    pkill -f "redis-server.jar" 2>/dev/null || true
+    for pid in "${PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -TERM "$pid" 2>/dev/null || true
+            # Wait briefly then force kill if still running
+            sleep 0.5
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+    PIDS=()
     rm -rf "$LOG_DIR"
 }
 
@@ -98,10 +109,11 @@ check_prerequisites() {
 start_master() {
     log_info "Starting master on port $MASTER_PORT..."
     java $JAVA_OPTS -jar "$JAR_PATH" --port $MASTER_PORT > "$LOG_DIR/master.log" 2>&1 &
+    PIDS+=($!)
     sleep 2
 
-    if pgrep -f "redis-server.jar.*$MASTER_PORT" > /dev/null; then
-        log_success "Master started on port $MASTER_PORT"
+    if kill -0 "${PIDS[-1]}" 2>/dev/null; then
+        log_success "Master started on port $MASTER_PORT (PID: ${PIDS[-1]})"
     else
         log_error "Failed to start master"
         cat "$LOG_DIR/master.log"
@@ -115,10 +127,11 @@ start_replica() {
     local master_port=$2
     log_info "Starting replica on port $port (replicaof localhost:$master_port)..."
     java $JAVA_OPTS -jar "$JAR_PATH" --port $port --replicaof localhost $master_port > "$LOG_DIR/replica_$port.log" 2>&1 &
+    PIDS+=($!)
     sleep 2
 
-    if pgrep -f "redis-server.jar.*$port" > /dev/null; then
-        log_success "Replica started on port $port"
+    if kill -0 "${PIDS[-1]}" 2>/dev/null; then
+        log_success "Replica started on port $port (PID: ${PIDS[-1]})"
     else
         log_error "Failed to start replica on port $port"
         cat "$LOG_DIR/replica_$port.log"
@@ -306,6 +319,10 @@ stress_test() {
     local end=$(date +%s%N)
 
     local duration_ms=$(( (end - start) / 1000000 ))
+    # Guard against division by zero
+    if [ "$duration_ms" -le 0 ]; then
+        duration_ms=1
+    fi
     local ops_per_sec=$(( count * 1000 / duration_ms ))
 
     log_success "Wrote $count keys in ${duration_ms}ms (${ops_per_sec} ops/sec)"
@@ -351,6 +368,9 @@ scale_test() {
 
     if [ $success -eq 3 ]; then
         log_success "All 3 replicas received the data!"
+    else
+        log_error "Only $success/3 replicas received the data"
+        return 1
     fi
 
     # Check master INFO

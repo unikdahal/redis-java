@@ -350,21 +350,37 @@ public class MasterConnection {
          * Parses a bulk string: $<length>\r\n<data>\r\n
          */
         private boolean parseBulkString(ByteBuf buf, List<String> result) {
-            int start = buf.readerIndex();
-            int end = buf.indexOf(start, buf.writerIndex(), (byte) '\r');
-            if (end == -1 || buf.readableBytes() < (end - start + 2)) return false;
+            int startIndex = buf.readerIndex();
+            int end = buf.indexOf(startIndex, buf.writerIndex(), (byte) '\r');
+            if (end == -1 || buf.readableBytes() < (end - startIndex + 2)) return false;
 
-            CharSequence lenStr = buf.readCharSequence(end - start, StandardCharsets.UTF_8);
+            CharSequence lenStr = buf.readCharSequence(end - startIndex, StandardCharsets.UTF_8);
             buf.skipBytes(2); // Skip \r\n
 
-            int len = Integer.parseInt(lenStr.toString());
+            int len;
+            try {
+                len = Integer.parseInt(lenStr.toString());
+            } catch (NumberFormatException e) {
+                System.err.println("[Replication] Malformed bulk string length: '" + lenStr + "'");
+                buf.readerIndex(startIndex);
+                return false;
+            }
+
+            // Handle null bulk string
             if (len == -1) {
                 result.add(null);
                 return true;
             }
 
+            // Validate length is not negative (except -1 sentinel)
+            if (len < 0) {
+                System.err.println("[Replication] Invalid bulk string length: " + len);
+                buf.readerIndex(startIndex);
+                return false;
+            }
+
             if (buf.readableBytes() < len + 2) {
-                buf.readerIndex(start);
+                buf.readerIndex(startIndex);
                 return false;
             }
 
@@ -378,23 +394,39 @@ public class MasterConnection {
          * Parses an array: *<count>\r\n followed by elements.
          */
         private boolean parseArray(ByteBuf buf, List<String> result) {
-            int start = buf.readerIndex();
-            int end = buf.indexOf(start, buf.writerIndex(), (byte) '\r');
-            if (end == -1 || buf.readableBytes() < (end - start + 2)) return false;
+            int startIndex = buf.readerIndex();
+            int end = buf.indexOf(startIndex, buf.writerIndex(), (byte) '\r');
+            if (end == -1 || buf.readableBytes() < (end - startIndex + 2)) return false;
 
-            CharSequence lenStr = buf.readCharSequence(end - start, StandardCharsets.UTF_8);
+            CharSequence lenStr = buf.readCharSequence(end - startIndex, StandardCharsets.UTF_8);
             buf.skipBytes(2); // Skip \r\n
 
-            int numElements = Integer.parseInt(lenStr.toString());
+            int numElements;
+            try {
+                numElements = Integer.parseInt(lenStr.toString());
+            } catch (NumberFormatException e) {
+                System.err.println("[Replication] Malformed array count: '" + lenStr + "'");
+                buf.readerIndex(startIndex);
+                return false;
+            }
+
+            // Handle null array
             if (numElements == -1) {
                 result.add(null);
                 return true;
             }
 
+            // Validate element count is not negative (except -1 sentinel)
+            if (numElements < 0) {
+                System.err.println("[Replication] Invalid array element count: " + numElements);
+                buf.readerIndex(startIndex);
+                return false;
+            }
+
             for (int i = 0; i < numElements; i++) {
                 List<String> element = new ArrayList<>();
                 if (!parseRespResponse(buf, element)) {
-                    buf.readerIndex(start);
+                    buf.readerIndex(startIndex);
                     return false;
                 }
                 result.addAll(element);
@@ -530,7 +562,24 @@ public class MasterConnection {
                 CharSequence sizeStr = in.readCharSequence(end - start, StandardCharsets.UTF_8);
                 in.skipBytes(2); // Skip \r\n
 
-                expectedRdbSize = Integer.parseInt(sizeStr.toString());
+                try {
+                    expectedRdbSize = Integer.parseInt(sizeStr.toString());
+                } catch (NumberFormatException e) {
+                    System.err.println("[Replication] Malformed RDB size: '" + sizeStr + "'");
+                    // Revert reader index adjustments
+                    in.readerIndex(start - 1); // Back to before '$' marker
+                    cleanupRdbState();
+                    ctx.close();
+                    return false;
+                }
+
+                if (expectedRdbSize < 0) {
+                    System.err.println("[Replication] Invalid RDB size: " + expectedRdbSize);
+                    cleanupRdbState();
+                    ctx.close();
+                    return false;
+                }
+
                 System.out.println("[Replication] Expecting RDB file: " + expectedRdbSize + " bytes");
                 rdbBuffer = Unpooled.buffer(expectedRdbSize);
             }

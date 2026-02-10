@@ -150,8 +150,9 @@ public class XReadCommand implements ICommand {
             // 1. Array Header for this stream (Name + Entries)
             streamSb.append("*2\r\n");
 
-            // 2. Stream Name
-            streamSb.append("$").append(key.length()).append("\r\n").append(key).append("\r\n");
+            // 2. Stream Name (use UTF-8 byte length)
+            byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+            streamSb.append("$").append(keyBytes.length).append("\r\n").append(key).append("\r\n");
 
             // 3. Array of Entries
             int entriesToReturn = Math.min(count, tail.size());
@@ -164,9 +165,10 @@ public class XReadCommand implements ICommand {
                 // Entry Structure: [ID, [Field, Value, ...]]
                 streamSb.append("*2\r\n");
 
-                // ID
+                // ID (use UTF-8 byte length)
                 String sid = entry.getKey().toString();
-                streamSb.append("$").append(sid.length()).append("\r\n").append(sid).append("\r\n");
+                byte[] sidBytes = sid.getBytes(StandardCharsets.UTF_8);
+                streamSb.append("$").append(sidBytes.length).append("\r\n").append(sid).append("\r\n");
 
                 // Field-Value Array
                 Map<String, String> fields = entry.getValue();
@@ -174,8 +176,10 @@ public class XReadCommand implements ICommand {
                 for (Map.Entry<String, String> f : fields.entrySet()) {
                     String fk = f.getKey();
                     String fv = f.getValue();
-                    streamSb.append("$").append(fk.length()).append("\r\n").append(fk).append("\r\n");
-                    streamSb.append("$").append(fv.length()).append("\r\n").append(fv).append("\r\n");
+                    byte[] fkBytes = fk.getBytes(StandardCharsets.UTF_8);
+                    byte[] fvBytes = fv.getBytes(StandardCharsets.UTF_8);
+                    streamSb.append("$").append(fkBytes.length).append("\r\n").append(fk).append("\r\n");
+                    streamSb.append("$").append(fvBytes.length).append("\r\n").append(fv).append("\r\n");
                 }
             }
             streamResponses.add(streamSb.toString());

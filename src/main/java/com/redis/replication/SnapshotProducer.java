@@ -213,10 +213,21 @@ public class SnapshotProducer {
             // Write all key-value pairs
             Map<String, RedisValue> snapshot = db.getSnapshot();
 
-            // Database size hint
+            // Pre-scan to count keys with expirations
+            int expiresCount = 0;
+            for (RedisValue value : snapshot.values()) {
+                if (!value.isExpired()) {
+                    Long expiry = value.getExpiryTime();
+                    if (expiry != null && expiry > 0) {
+                        expiresCount++;
+                    }
+                }
+            }
+
+            // Database size hint with actual expires count
             out.write(RDB_OPCODE_RESIZEDB);
             writeLength(out, snapshot.size()); // db size
-            writeLength(out, 0); // expires size (simplified)
+            writeLength(out, expiresCount); // actual expires count
 
             for (Map.Entry<String, RedisValue> entry : snapshot.entrySet()) {
                 String key = entry.getKey();
@@ -380,9 +391,26 @@ public class SnapshotProducer {
 
     // ==================== Reset (Testing) ====================
 
+    /**
+     * Clears any in-progress snapshot state.
+     * Should be called before reset() to avoid leaking state.
+     */
+    public void cancelInProgress() {
+        // Atomically clear the in-progress flag
+        // Any thread waiting on snapshot completion will need to re-check
+        inProgress.set(false);
+        baselineOffset.set(0);
+    }
+
     public static void reset() {
         synchronized (INIT_LOCK) {
+            SnapshotProducer oldInstance = INSTANCE;
             INSTANCE = null;
+
+            // Clean up the old instance if it exists
+            if (oldInstance != null) {
+                oldInstance.cancelInProgress();
+            }
         }
     }
 }

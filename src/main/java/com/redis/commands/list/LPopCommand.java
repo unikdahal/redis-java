@@ -6,6 +6,7 @@ import com.redis.storage.RedisDatabase;
 import com.redis.storage.RedisValue;
 import io.netty.channel.ChannelHandlerContext;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -127,14 +128,16 @@ public class LPopCommand implements ICommand {
         // Single element mode (no count argument)
         if (!returnArray) {
             String element = popped.getFirst();
-            return "$" + element.length() + "\r\n" + element + "\r\n";
+            byte[] elementBytes = element.getBytes(StandardCharsets.UTF_8);
+            return "$" + elementBytes.length + "\r\n" + element + "\r\n";
         }
 
         // Array mode (count argument provided)
         StringBuilder sb = new StringBuilder();
         sb.append("*").append(popped.size()).append("\r\n");
         for (String element : popped) {
-            sb.append("$").append(element.length()).append("\r\n");
+            byte[] elementBytes = element.getBytes(StandardCharsets.UTF_8);
+            sb.append("$").append(elementBytes.length).append("\r\n");
             sb.append(element).append("\r\n");
         }
         return sb.toString();

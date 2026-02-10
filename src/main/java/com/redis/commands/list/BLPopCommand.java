@@ -2,6 +2,8 @@ package com.redis.commands.list;
 
 import com.redis.commands.ICommand;
 
+import com.redis.replication.CommandPropagator;
+import com.redis.replication.ReplicationManager;
 import com.redis.storage.RedisDatabase;
 import com.redis.storage.RedisValue;
 import io.netty.buffer.Unpooled;
@@ -138,6 +140,7 @@ public class BLPopCommand implements ICommand {
     /**
      * Schedule asynchronous polling for data using Netty's event loop.
      * This avoids blocking the I/O thread while waiting for data.
+     * When a pop succeeds, it also propagates to replicas.
      */
     private void schedulePolling(ChannelHandlerContext ctx, List<String> keys, long deadline, RedisDatabase db) {
         ctx.executor().schedule(() -> {
@@ -154,7 +157,14 @@ public class BLPopCommand implements ICommand {
                 String result = tryPopFromKey(db, key);
                 if (result != null) {
                     // Found data, send response
-                    writeResponse(ctx, formatResult(key, result));
+                    String response = formatResult(key, result);
+                    writeResponse(ctx, response);
+
+                    // Propagate to replicas - use LPOP with the key that was popped
+                    // This ensures replicas receive deterministic LPOP commands
+                    if (ReplicationManager.getInstance().isMaster()) {
+                        CommandPropagator.propagate("LPOP", List.of(key));
+                    }
                     return;
                 }
             }
@@ -223,18 +233,23 @@ public class BLPopCommand implements ICommand {
 
     /**
      * Builds a Redis RESP two-element array representing [key, element].
+     * Uses UTF-8 byte lengths for proper RESP encoding.
      *
      * @param key the list key to include as the first element
      * @param element the popped element to include as the second element
      * @return the RESP-formatted string for an array containing the key and element
      */
     private String formatResult(String key, String element) {
+        // Use UTF-8 byte lengths for RESP bulk string headers
+        byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+        byte[] elementBytes = element.getBytes(StandardCharsets.UTF_8);
+
         // Return RESP array: *2\r\n$keylen\r\nkey\r\n$elemlen\r\nelement\r\n
         StringBuilder sb = new StringBuilder();
         sb.append("*2\r\n");
-        sb.append("$").append(key.length()).append("\r\n");
+        sb.append("$").append(keyBytes.length).append("\r\n");
         sb.append(key).append("\r\n");
-        sb.append("$").append(element.length()).append("\r\n");
+        sb.append("$").append(elementBytes.length).append("\r\n");
         sb.append(element).append("\r\n");
         return sb.toString();
     }

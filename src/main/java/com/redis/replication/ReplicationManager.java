@@ -107,6 +107,9 @@ public class ReplicationManager {
     /** Initial WAIT poll interval */
     private static final long INITIAL_WAIT_POLL_INTERVAL_MS = 1;
 
+    /** Maximum time for "infinite" wait (5 minutes) to prevent truly blocking forever */
+    private static final long MAX_INFINITE_WAIT_MS = 5 * 60 * 1000;
+
     /** Backpressure warning threshold (10MB lag) */
     private static final long BACKPRESSURE_LAG_THRESHOLD = 10 * 1024 * 1024;
 
@@ -409,11 +412,12 @@ public class ReplicationManager {
                 continue;
             }
 
-            // Backpressure check
+            // Backpressure check - transient condition, don't count toward circuit breaker
             if (!channel.isWritable()) {
                 skippedBackpressure++;
                 backpressureEvents.increment();
-                recordReplicaFailure(channel);
+                // Note: intentionally NOT calling recordReplicaFailure here
+                // Backpressure is transient and should not trigger circuit breaker
                 continue;
             }
 
@@ -477,7 +481,7 @@ public class ReplicationManager {
      * Use WaitCommand's async offloading mechanism.
      *
      * @param numReplicas Minimum number of replicas to wait for
-     * @param timeoutMs Timeout in milliseconds. 0 means wait forever.
+     * @param timeoutMs Timeout in milliseconds. 0 means wait up to MAX_INFINITE_WAIT_MS.
      * @return Number of replicas that acknowledged within the timeout
      */
     public int waitForReplicas(int numReplicas, long timeoutMs) {
@@ -492,9 +496,13 @@ public class ReplicationManager {
 
         requestAckFromReplicas();
 
-        // timeoutMs == 0 means wait forever (use Long.MAX_VALUE as deadline)
-        long deadline = (timeoutMs == 0) ? Long.MAX_VALUE : System.currentTimeMillis() + timeoutMs;
+        // Cap "infinite" waits to MAX_INFINITE_WAIT_MS to prevent blocking forever
+        long effectiveTimeout = (timeoutMs == 0) ? MAX_INFINITE_WAIT_MS : timeoutMs;
+        long deadline = System.currentTimeMillis() + effectiveTimeout;
         long pollInterval = INITIAL_WAIT_POLL_INTERVAL_MS;
+
+        // Track initial replica count to detect changes
+        int initialReplicaCount = getConnectedReplicaCount();
 
         while (System.currentTimeMillis() < deadline) {
             int acknowledged = countAcknowledgedReplicas(targetOffset);
@@ -502,14 +510,24 @@ public class ReplicationManager {
                 return acknowledged;
             }
 
+            // Check if replicas are still connected
+            int currentReplicaCount = getConnectedReplicaCount();
+            if (currentReplicaCount == 0) {
+                // No replicas connected, return early
+                return 0;
+            }
+
+            // If replica count changed significantly, re-request acks
+            if (currentReplicaCount != initialReplicaCount) {
+                requestAckFromReplicas();
+                initialReplicaCount = currentReplicaCount;
+            }
+
             long remaining = deadline - System.currentTimeMillis();
             if (remaining <= 0) break;
 
             try {
-                // Cap sleep time for infinite timeout to allow periodic checks
-                long sleepTime = (timeoutMs == 0)
-                    ? Math.min(pollInterval, MAX_WAIT_POLL_INTERVAL_MS)
-                    : Math.min(pollInterval, Math.min(remaining, MAX_WAIT_POLL_INTERVAL_MS));
+                long sleepTime = Math.min(pollInterval, Math.min(remaining, MAX_WAIT_POLL_INTERVAL_MS));
                 Thread.sleep(sleepTime);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -527,8 +545,14 @@ public class ReplicationManager {
         byte[] cmd = "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n"
             .getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
+        // Update master offset to account for GETACK command bytes
+        // This ensures offset consistency with replicas
+        int cmdLength = cmd.length;
+
         for (ReplicaConnection replica : replicas.values()) {
             if (replica.getState() == ReplicaConnection.ReplicaState.STREAMING) {
+                // Increment offset before sending to maintain consistency
+                masterReplOffset.addAndGet(cmdLength);
                 replica.getChannel().writeAndFlush(
                     io.netty.buffer.Unpooled.wrappedBuffer(cmd));
             }

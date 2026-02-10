@@ -6,6 +6,7 @@ import com.redis.storage.RedisValue;
 import com.redis.util.StreamId;
 import io.netty.channel.ChannelHandlerContext;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -91,7 +92,8 @@ public class XRangeCommand implements ICommand {
 
             // 1. The ID
             String idStr = entry.getKey().toString();
-            sb.append("$").append(idStr.length()).append("\r\n").append(idStr).append("\r\n");
+            byte[] idBytes = idStr.getBytes(StandardCharsets.UTF_8);
+            sb.append("$").append(idBytes.length).append("\r\n").append(idStr).append("\r\n");
 
             // 2. The Field-Value pairs
             Map<String, String> fields = entry.getValue();
@@ -100,8 +102,10 @@ public class XRangeCommand implements ICommand {
             for (Map.Entry<String, String> field : fields.entrySet()) {
                 String k = field.getKey();
                 String v = field.getValue();
-                sb.append("$").append(k.length()).append("\r\n").append(k).append("\r\n");
-                sb.append("$").append(v.length()).append("\r\n").append(v).append("\r\n");
+                byte[] kBytes = k.getBytes(StandardCharsets.UTF_8);
+                byte[] vBytes = v.getBytes(StandardCharsets.UTF_8);
+                sb.append("$").append(kBytes.length).append("\r\n").append(k).append("\r\n");
+                sb.append("$").append(vBytes.length).append("\r\n").append(v).append("\r\n");
             }
         }
 
