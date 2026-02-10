@@ -2,7 +2,7 @@
 
 ## High-Level Overview
 
-This repository contains a lightweight, high-performance, in-memory Redis-compatible server built with **Java 25** and **Netty**. The project implements a subset of Redis commands (SET, GET, DEL) using the Redis Serialization Protocol (RESP) for communication. It's designed for simplicity, performance, and educational purposes.
+This repository contains a lightweight, high-performance, in-memory Redis-compatible server built with **Java 25** and **Netty**. The project implements a comprehensive subset of Redis commands using the Redis Serialization Protocol (RESP) for communication. It features full master-replica replication with deterministic command propagation.
 
 **Key Technologies:**
 - Java 25 with preview features enabled
@@ -10,6 +10,14 @@ This repository contains a lightweight, high-performance, in-memory Redis-compat
 - Maven 3.9+ for build management
 - JUnit 5 and Mockito for testing
 - RESP (Redis Serialization Protocol) for client-server communication
+
+**Supported Command Categories:**
+- String operations: SET, GET, INCR
+- List operations: LPUSH, RPUSH, LPOP, LLEN, LRANGE, BLPOP
+- Stream operations: XADD, XRANGE, XREAD
+- Transactions: MULTI, EXEC, DISCARD
+- Key management: DEL, EXPIRE, TTL, TYPE
+- Replication: REPLCONF, PSYNC, INFO
 
 ## Build Instructions
 
@@ -79,28 +87,43 @@ redis-java/
 │   │   ├── commands/                # Command implementations
 │   │   │   ├── ICommand.java        # Command interface
 │   │   │   ├── CommandRegistry.java # Command lookup registry
-│   │   │   ├── SetCommand.java      # SET command implementation
-│   │   │   ├── GetCommand.java      # GET command implementation
-│   │   │   └── DelCommand.java      # DEL command implementation
+│   │   │   ├── string/              # String commands (SET, GET, INCR)
+│   │   │   ├── list/                # List commands (LPUSH, RPUSH, LPOP, etc.)
+│   │   │   ├── stream/              # Stream commands (XADD, XRANGE, XREAD)
+│   │   │   ├── generic/             # Generic commands (DEL, EXPIRE, TYPE, etc.)
+│   │   │   ├── transaction/         # Transaction commands (MULTI, EXEC, DISCARD)
+│   │   │   └── replication/         # Replication commands (REPLCONF, PSYNC, INFO)
 │   │   ├── config/
 │   │   │   └── RedisConfig.java     # Server configuration
 │   │   ├── server/
 │   │   │   ├── NettyRedisServer.java    # Main server class (entry point)
-│   │   │   └── RedisCommandHandler.java # RESP protocol handler
+│   │   │   └── RedisCommandHandler.java # RESP protocol handler + replica write protection
 │   │   ├── storage/
 │   │   │   ├── RedisDatabase.java   # In-memory data store (ConcurrentHashMap)
+│   │   │   ├── RedisValue.java      # Type-safe value wrapper (sealed interface)
 │   │   │   └── ExpiryManager.java   # Key expiration manager (DelayQueue)
+│   │   ├── replication/
+│   │   │   ├── ReplicationManager.java  # Central replication state and operations
+│   │   │   ├── ReplicationLog.java      # Lock-free ring buffer for partial resync
+│   │   │   ├── SnapshotProducer.java    # RDB snapshot generation for full resync
+│   │   │   ├── CommandPropagator.java   # Command canonicalization and propagation
+│   │   │   ├── ReplicaConnection.java   # Per-replica connection state
+│   │   │   ├── MasterConnection.java    # Replica-to-master connection handler
+│   │   │   ├── RdbGenerator.java        # RDB file format generation
+│   │   │   └── ServerRole.java          # MASTER/SLAVE enum
+│   │   ├── transaction/
+│   │   │   └── TransactionContext.java  # Per-connection transaction state
 │   │   └── util/
-│   │       └── ExpiryTask.java      # Expiry task implementation
+│   │       ├── ExpiryTask.java      # Expiry task implementation
+│   │       └── StreamId.java        # Stream entry ID handling
 │   ├── main/test/test.sh            # Manual integration test script
 │   └── test/java/com/redis/
 │       ├── commands/                # Unit tests for commands
-│       │   ├── SetCommandTest.java
-│       │   ├── GetCommandTest.java
-│       │   ├── DelCommandTest.java
-│       │   └── GetDelCommandTest.java
+│       ├── replication/             # Replication unit tests
+│       │   ├── ReplicationLogTest.java
+│       │   └── SnapshotProducerTest.java
+│       ├── integration/             # Integration tests
 │       └── storage/                 # Unit tests for storage
-│           └── RedisDatabaseTest.java
 └── target/
     └── redis-server.jar             # Executable JAR (generated after build)
 ```
@@ -111,9 +134,61 @@ The server follows a layered architecture:
 
 1. **Network Layer (Netty):** `NettyRedisServer` accepts connections using Netty's boss and worker thread pools
 2. **Protocol Layer:** `RedisCommandHandler` parses RESP protocol and delegates to command registry
-3. **Command Layer:** Individual command implementations (`SetCommand`, `GetCommand`, `DelCommand`) in `commands/`
+3. **Command Layer:** Individual command implementations in `commands/` subdirectories (string/, list/, stream/, generic/, transaction/, replication/)
 4. **Storage Layer:** `RedisDatabase` manages in-memory key-value storage with `ConcurrentHashMap`
 5. **Expiration Layer:** `ExpiryManager` handles TTL-based key expiration using `DelayQueue`
+6. **Replication Layer:** `ReplicationManager` + `CommandPropagator` + `ReplicationLog` + `SnapshotProducer` handle master-replica replication
+
+### Replication Architecture (Production-Grade)
+
+The replication system implements a **single-writer, log-based state machine** with snapshot checkpoints:
+
+```
+parse → validate → canonicalize → execute → append to log → send to replicas
+```
+
+**Core Roles:**
+| Role | Responsibilities |
+|:-----|:-----------------|
+| **Master** | Accepts writes, executes commands, owns replication log, propagates to replicas |
+| **Replica** | Rejects writes (READONLY), replays commands, tracks offset, requests PSYNC |
+| **SnapshotProducer** | Creates point-in-time state snapshots independent of live mutations |
+
+**Key Components:**
+- `ReplicationManager` - Manages master/replica roles, replica connections, offset tracking, circuit breakers
+- `ReplicationLog` - Lock-free ring buffer (64KB-512MB) for partial resync support
+- `SnapshotProducer` - Generates RDB snapshots for full resync
+- `CommandPropagator` - Determines which commands to propagate and handles RESP encoding
+- `ReplicaConnection` - Per-replica state tracking with backpressure handling
+- `ICommand.getReplicationArgs()` - Commands can override to provide canonical arguments
+- `ICommand.getReplicationCommandName()` - Commands can override to use different command for replication
+
+**Optimizations Over Redis:**
+| Feature | Redis | This Implementation |
+|:--------|:------|:--------------------|
+| Offset Tracking | Mutex-protected long | Lock-free `AtomicLong` |
+| Statistics | Atomic increments | `LongAdder` (10x faster) |
+| Backlog | Single producer lock | Lock-free ring buffer |
+| Propagation | Synchronous per-replica | Async with circuit breaker |
+| WAIT Polling | Fixed interval | Adaptive exponential backoff |
+| Failure Handling | Simple disconnect | Circuit breaker + recovery |
+
+**Command Canonicalization:**
+Non-deterministic commands are rewritten before replication:
+- `XADD stream * field value` → `XADD stream <actual-id> field value`
+- `SET key value EX 60` → `SET key value PXAT <timestamp>`
+- `EXPIRE key 60` → `PEXPIREAT key <timestamp>`
+
+**Full Sync vs Partial Sync Decision:**
+```
+ID mismatch → FULL SYNC
+offset not in backlog → FULL SYNC
+else → PARTIAL SYNC
+```
+No heuristics. No guessing. The decision is deterministic.
+
+**Write Protection on Replicas:**
+Replicas automatically reject write commands with `-READONLY` error. This is enforced in `RedisCommandHandler`.
 
 ## Key Development Guidelines
 
@@ -135,6 +210,10 @@ The server follows a layered architecture:
    - Implement `ICommand` interface
    - Register in `CommandRegistry`
    - Add unit tests in `src/test/java/com/redis/commands/`
+   - For write commands:
+     - Override `isWriteCommand()` to return `true`
+     - If command has non-deterministic behavior, override `getReplicationArgs()` to return canonical arguments
+     - If command should replicate as different command, override `getReplicationCommandName()`
 
 5. **Testing:**
    - Always run `mvn test` before committing

@@ -34,4 +34,9 @@ public class DelCommand implements ICommand {
     public String name() {
         return "DEL";
     }
+
+    @Override
+    public boolean isWriteCommand() {
+        return true;
+    }
 }

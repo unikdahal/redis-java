@@ -63,4 +63,9 @@ public class LPushCommand implements ICommand {
     public String name() {
         return "LPUSH";
     }
+
+    @Override
+    public boolean isWriteCommand() {
+        return true;
+    }
 }

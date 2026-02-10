@@ -2,6 +2,8 @@ package com.redis.server;
 
 import com.redis.commands.CommandRegistry;
 import com.redis.commands.ICommand;
+import com.redis.replication.CommandPropagator;
+import com.redis.replication.ReplicationManager;
 import com.redis.transaction.TransactionContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -39,6 +41,29 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
      * These are the transaction control commands themselves.
      */
     private static final Set<String> TRANSACTION_COMMANDS = Set.of("EXEC", "DISCARD", "MULTI");
+
+    /**
+     * Commands that are allowed on replicas (read-only + replication commands).
+     * Write commands are rejected on replicas to maintain consistency.
+     */
+    private static final Set<String> REPLICA_ALLOWED_COMMANDS = Set.of(
+        // Read commands
+        "GET", "MGET", "EXISTS", "TYPE", "TTL", "PTTL", "KEYS", "SCAN",
+        "LLEN", "LRANGE", "LINDEX",
+        "SISMEMBER", "SMEMBERS", "SCARD",
+        "HGET", "HGETALL", "HMGET", "HLEN", "HKEYS", "HVALS", "HEXISTS",
+        "ZRANGE", "ZRANGEBYSCORE", "ZRANK", "ZSCORE", "ZCARD",
+        "XLEN", "XRANGE", "XREAD", "XINFO",
+        // Utility commands
+        "PING", "ECHO", "INFO", "DEBUG", "COMMAND", "CLIENT", "CONFIG",
+        // Replication commands (handled specially)
+        "REPLCONF", "PSYNC"
+    );
+
+    /**
+     * RESP error response for write attempts on replicas.
+     */
+    private static final String RESP_READONLY = "-READONLY You can't write against a read only replica.\r\n";
 
     /**
      * RESP response for successfully queued commands in a transaction.
@@ -110,6 +135,15 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
                 }
                 writeResponse(ctx, "-ERR unknown command '" + commandName + "'\r\n");
             } else {
+                // REPLICA WRITE PROTECTION:
+                // If this server is a replica and the command is a write command,
+                // reject it to maintain data consistency with the master.
+                ReplicationManager replMgr = ReplicationManager.getInstance();
+                if (replMgr.isSlave() && cmd.isWriteCommand() && !isReplicationCommand(upperCommandName)) {
+                    writeResponse(ctx, RESP_READONLY);
+                    continue;
+                }
+
                 // Create a view of the arguments (skipping the command name).
                 // subList is a lightweight view, not a copy.
                 List<String> commandArgs = argsBuffer.size() > 1 ? argsBuffer.subList(1, argsBuffer.size()) : List.of();
@@ -130,6 +164,27 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
                     // Null responses implies the command handles its own writing asynchronously (e.g., blocking ops).
                     if (resp != null) {
                         writeResponse(ctx, resp);
+
+                        // REPLICATION: Propagate write commands to replicas
+                        // Only propagate if command was successful (no error response)
+                        if (!resp.startsWith("-") && CommandPropagator.shouldPropagate(upperCommandName)) {
+                            // Get canonical args for replication (handles XADD *, SET EX, etc.)
+                            // This ensures replicas receive deterministic commands
+                            List<String> replicationArgs = cmd.getReplicationArgs(commandArgs, resp);
+
+                            // Some commands need to be replicated as different commands
+                            // (e.g., EXPIRE → PEXPIREAT for absolute timestamps)
+                            String replicationCmdName = cmd.getReplicationCommandName();
+                            if (replicationCmdName == null) {
+                                replicationCmdName = upperCommandName;
+                            }
+
+                            if (replicationArgs != null) {
+                                CommandPropagator.propagate(replicationCmdName, replicationArgs);
+                            } else {
+                                CommandPropagator.propagate(replicationCmdName, commandArgs);
+                            }
+                        }
                     }
                 }
             }
@@ -260,6 +315,14 @@ public class RedisCommandHandler extends ByteToMessageDecoder {
      */
     private void writeResponse(ChannelHandlerContext ctx, String response) {
         ctx.writeAndFlush(Unpooled.copiedBuffer(response, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Checks if a command is a replication-related command.
+     * These commands are allowed on replicas even though they may modify internal state.
+     */
+    private boolean isReplicationCommand(String commandName) {
+        return "REPLCONF".equals(commandName) || "PSYNC".equals(commandName);
     }
 
     @Override

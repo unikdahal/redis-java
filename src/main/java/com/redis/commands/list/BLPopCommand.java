@@ -248,4 +248,9 @@ public class BLPopCommand implements ICommand {
     public String name() {
         return "BLPOP";
     }
+
+    @Override
+    public boolean isWriteCommand() {
+        return true;
+    }
 }

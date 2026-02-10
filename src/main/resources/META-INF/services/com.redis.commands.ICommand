@@ -1,6 +1,7 @@
 com.redis.commands.generic.DelCommand
 com.redis.commands.generic.EchoCommand
 com.redis.commands.generic.ExpireCommand
+com.redis.commands.generic.PExpireAtCommand
 com.redis.commands.generic.PingCommand
 com.redis.commands.generic.TtlCommand
 com.redis.commands.generic.TypeCommand
@@ -19,3 +20,7 @@ com.redis.commands.stream.XReadCommand
 com.redis.commands.transaction.MultiCommand
 com.redis.commands.transaction.ExecCommand
 com.redis.commands.transaction.DiscardCommand
+com.redis.commands.replication.InfoCommand
+com.redis.commands.replication.ReplconfCommand
+com.redis.commands.replication.PsyncCommand
+com.redis.commands.replication.WaitCommand

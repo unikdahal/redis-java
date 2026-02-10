@@ -1,6 +1,8 @@
 package com.redis.storage;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -300,5 +302,45 @@ public class RedisDatabase {
 
             return new ValueEntry(newValue, expiry);
         });
+    }
+
+    // ==================== Snapshot Support ====================
+
+    /**
+     * Creates a point-in-time snapshot of the database.
+     * <p>
+     * This method is used for RDB generation during full resync.
+     * The returned map is a shallow copy suitable for iteration.
+     *
+     * @return Map of key to RedisValue with expiry information
+     */
+    public Map<String, RedisValue> getSnapshot() {
+        Map<String, RedisValue> snapshot = new HashMap<>();
+
+        for (Map.Entry<String, ValueEntry> entry : map.entrySet()) {
+            ValueEntry ve = entry.getValue();
+            if (ve != null && !isExpired(ve)) {
+                // Create a copy of the value with expiry time preserved
+                RedisValue value = ve.value();
+                // Set the expiry time on the value for RDB serialization
+                if (ve.expiryMillis() != Long.MAX_VALUE) {
+                    value = value.withExpiry(ve.expiryMillis());
+                }
+                snapshot.put(entry.getKey(), value);
+            }
+        }
+
+        return snapshot;
+    }
+
+    /**
+     * Returns all keys in the database (for KEYS command).
+     * <p>
+     * Note: This may include keys that are technically expired but not yet cleaned up.
+     *
+     * @return Collection of all key names
+     */
+    public Collection<String> keys() {
+        return map.keySet();
     }
 }

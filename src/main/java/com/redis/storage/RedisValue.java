@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
  * the collections inside (ArrayList, HashMap) are wrapped in thread-safe implementations
  * (ConcurrentHashMap, SynchronizedList) to support concurrent access.
  */
-public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.ListValue, RedisValue.SetValue, RedisValue.HashValue, RedisValue.SortedSetValue, RedisValue.StreamValue {
+public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.ListValue, RedisValue.SetValue, RedisValue.HashValue, RedisValue.SortedSetValue, RedisValue.StreamValue, RedisValue.ExpiringValue {
 
     /**
      * Enumeration of supported Redis data types.
@@ -144,6 +144,42 @@ public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.Li
      */
     default boolean isType(Type expectedType) {
         return getType() == expectedType;
+    }
+
+    // ==================== Expiry Support (for Snapshots) ====================
+
+    /**
+     * Gets the expiry time associated with this value.
+     * <p>
+     * This is only set during snapshot operations for RDB serialization.
+     * Normal storage expiry is managed by RedisDatabase.
+     *
+     * @return Expiry timestamp in milliseconds, or null if not set
+     */
+    default Long getExpiryTime() {
+        return null;
+    }
+
+    /**
+     * Checks if this value is expired (for snapshot consistency).
+     *
+     * @return true if expired
+     */
+    default boolean isExpired() {
+        Long expiry = getExpiryTime();
+        return expiry != null && expiry <= System.currentTimeMillis();
+    }
+
+    /**
+     * Creates a copy of this value with an expiry time set.
+     * <p>
+     * Used during snapshot creation to preserve expiry metadata.
+     *
+     * @param expiryTimeMillis The expiry timestamp in milliseconds
+     * @return A new RedisValue with expiry set
+     */
+    default RedisValue withExpiry(long expiryTimeMillis) {
+        return new ExpiringValue(this, expiryTimeMillis);
     }
 
     // ==================== Implementation Records ====================
@@ -307,6 +343,74 @@ public sealed interface RedisValue permits RedisValue.StringValue, RedisValue.Li
         @Override
         public String toString() {
             return "RedisValue{type=STREAM, data=" + stream + "}";
+        }
+    }
+
+    /**
+     * Wrapper for values with expiry metadata.
+     * <p>
+     * Used during snapshot operations to preserve TTL information for RDB serialization.
+     * This is a transient wrapper, not used for normal storage.
+     */
+    record ExpiringValue(RedisValue wrapped, long expiryTimeMillis) implements RedisValue {
+        @Override
+        public Type getType() {
+            return wrapped.getType();
+        }
+
+        @Override
+        public Object getData() {
+            return wrapped.getData();
+        }
+
+        @Override
+        public Long getExpiryTime() {
+            return expiryTimeMillis;
+        }
+
+        @Override
+        public boolean isExpired() {
+            return expiryTimeMillis <= System.currentTimeMillis();
+        }
+
+        @Override
+        public RedisValue withExpiry(long newExpiryTimeMillis) {
+            return new ExpiringValue(wrapped, newExpiryTimeMillis);
+        }
+
+        @Override
+        public String asString() {
+            return wrapped.asString();
+        }
+
+        @Override
+        public List<String> asList() {
+            return wrapped.asList();
+        }
+
+        @Override
+        public Set<String> asSet() {
+            return wrapped.asSet();
+        }
+
+        @Override
+        public Map<String, String> asHash() {
+            return wrapped.asHash();
+        }
+
+        @Override
+        public Map<String, Double> asSortedSet() {
+            return wrapped.asSortedSet();
+        }
+
+        @Override
+        public Map<StreamId, Map<String, String>> asStream() {
+            return wrapped.asStream();
+        }
+
+        @Override
+        public String toString() {
+            return "RedisValue{type=" + getType() + ", expiry=" + expiryTimeMillis + ", data=" + wrapped.getData() + "}";
         }
     }
 };

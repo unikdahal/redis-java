@@ -149,4 +149,9 @@ public class LPopCommand implements ICommand {
     public String name() {
         return "LPOP";
     }
+
+    @Override
+    public boolean isWriteCommand() {
+        return true;
+    }
 }
