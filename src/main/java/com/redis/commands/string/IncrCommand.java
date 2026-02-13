@@ -78,4 +78,9 @@ public class IncrCommand implements ICommand {
     public String name() {
         return "INCR";
     }
+
+    @Override
+    public boolean isWriteCommand() {
+        return true;
+    }
 }

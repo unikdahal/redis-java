@@ -6,7 +6,50 @@ import java.util.List;
 
 /**
  * Base interface for all Redis commands.
+ * <p>
  * Each command implementation must define its name and execution logic.
+ * Commands are registered with {@link CommandRegistry} for O(1) lookup.
+ *
+ * <h2>Command Pipeline</h2>
+ * <p>
+ * Every command goes through this exact pipeline:
+ * <pre>
+ * parse → validate → canonicalize → execute → append to log → send to replicas
+ * </pre>
+ *
+ * <h2>Replication Contract</h2>
+ * <p>
+ * Write commands that modify state must follow these rules:
+ * <ol>
+ *   <li>Override {@link #isWriteCommand()} to return {@code true}</li>
+ *   <li>For non-deterministic commands, override {@link #getReplicationArgs(List, String)}
+ *       to return canonical arguments</li>
+ *   <li>If the command should replicate as a different command, override
+ *       {@link #getReplicationCommandName()}</li>
+ * </ol>
+ *
+ * <h2>Canonicalization Examples</h2>
+ * <table border="1">
+ *   <tr><th>Original Command</th><th>Canonical Form</th><th>Reason</th></tr>
+ *   <tr><td>{@code XADD stream * field value}</td>
+ *       <td>{@code XADD stream 1706745600000-0 field value}</td>
+ *       <td>Auto-generated ID depends on timestamp</td></tr>
+ *   <tr><td>{@code SET key value EX 60}</td>
+ *       <td>{@code SET key value PXAT 1706745660000}</td>
+ *       <td>Relative time → absolute timestamp</td></tr>
+ *   <tr><td>{@code EXPIRE key 60}</td>
+ *       <td>{@code PEXPIREAT key 1706745660000}</td>
+ *       <td>Relative seconds → absolute milliseconds</td></tr>
+ * </table>
+ *
+ * <h2>Thread Safety</h2>
+ * <p>
+ * Command instances are typically singletons registered once. The {@link #execute}
+ * method must be thread-safe as it may be called concurrently from multiple
+ * Netty event loop threads.
+ *
+ * @see CommandRegistry
+ * @see com.redis.replication.CommandPropagator
  */
 public interface ICommand {
     /**
@@ -25,4 +68,51 @@ public interface ICommand {
      * Command names are case-insensitive at lookup time.
      */
     String name();
+
+    /**
+     * Returns the canonical arguments for replication.
+     * <p>
+     * Override this method when the command needs to be rewritten for replication
+     * to ensure a consistent state across replicas. Common cases include:
+     * <ul>
+     *   <li>Auto-generated values (e.g., XADD with * ID → actual ID)</li>
+     *   <li>Relative time to absolute time (e.g., SET EX 60 → SET PXAT timestamp)</li>
+     * </ul>
+     * <p>
+     * The default implementation returns null, indicating the original args
+     * should be used for propagation.
+     *
+     * @param originalArgs The original command arguments
+     * @param response The response from execute() - can be used to extract generated values
+     * @return Canonical arguments for replication, or null to use original args
+     */
+    default List<String> getReplicationArgs(List<String> originalArgs, String response) {
+        return null; // Default: use original args
+    }
+
+    /**
+     * Indicates whether this command modifies state and should be propagated to replicas.
+     * <p>
+     * Override to return true for write commands (SET, DEL, LPUSH, etc.).
+     * Default is false (read-only command).
+     *
+     * @return true if this command should be propagated to replicas
+     */
+    default boolean isWriteCommand() {
+        return false;
+    }
+
+    /**
+     * Returns the command name to use for replication.
+     * <p>
+     * Override when the command should be replicated as a different command.
+     * For example, EXPIRE should be replicated as PEXPIREAT to use absolute timestamps.
+     * <p>
+     * Default returns null, meaning use the original command name.
+     *
+     * @return The command name to use for replication, or null to use original
+     */
+    default String getReplicationCommandName() {
+        return null;
+    }
 }

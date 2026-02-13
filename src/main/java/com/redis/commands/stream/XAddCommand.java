@@ -162,4 +162,86 @@ public class XAddCommand implements ICommand {
     public String name() {
         return "XADD";
     }
+
+    @Override
+    public boolean isWriteCommand() {
+        return true;
+    }
+
+    /**
+     * Returns canonical arguments for replication.
+     * <p>
+     * For XADD, we must replace auto-generated IDs (* or timestamp-*) with
+     * the actual ID that was generated. This ensures replicas have the exact
+     * same entry ID as the master.
+     * <p>
+     * Example: {@code XADD stream * field value} with generated ID "123-0"
+     * becomes {@code XADD stream 123-0 field value} for replication.
+     *
+     * @param originalArgs The original arguments including potential * or timestamp-*
+     * @param response The response containing the generated ID
+     * @return Arguments with actual ID substituted for auto-generated ones
+     */
+    @Override
+    public List<String> getReplicationArgs(List<String> originalArgs, String response) {
+        if (originalArgs.size() < 2) {
+            return null;
+        }
+
+        String idArg = originalArgs.get(1);
+
+        // Check if ID was auto-generated (* or timestamp-*)
+        if (!idArg.equals("*") && !idArg.endsWith("-*")) {
+            // Explicit ID was provided, no rewriting needed
+            return null;
+        }
+
+        // Extract the actual ID from the response
+        // Response format: $<len>\r\n<id>\r\n
+        String actualId = extractIdFromResponse(response);
+        if (actualId == null) {
+            return null; // Error response, don't propagate
+        }
+
+        // Build new args list with actual ID
+        List<String> replicationArgs = new java.util.ArrayList<>(originalArgs.size());
+        replicationArgs.add(originalArgs.get(0)); // key
+        replicationArgs.add(actualId);            // actual ID instead of * or timestamp-*
+
+        // Copy remaining args (field-value pairs)
+        for (int i = 2; i < originalArgs.size(); i++) {
+            replicationArgs.add(originalArgs.get(i));
+        }
+
+        return replicationArgs;
+    }
+
+    /**
+     * Extracts the stream entry ID from a bulk string response.
+     *
+     * @param response RESP bulk string format: $<len>\r\n<id>\r\n
+     * @return The ID string, or null if response is invalid/error
+     */
+    private String extractIdFromResponse(String response) {
+        if (response == null || response.startsWith("-")) {
+            return null; // Error response
+        }
+
+        // Parse bulk string: $<len>\r\n<data>\r\n
+        if (!response.startsWith("$")) {
+            return null;
+        }
+
+        int firstCrlf = response.indexOf("\r\n");
+        if (firstCrlf < 0) {
+            return null;
+        }
+
+        int secondCrlf = response.indexOf("\r\n", firstCrlf + 2);
+        if (secondCrlf < 0) {
+            return null;
+        }
+
+        return response.substring(firstCrlf + 2, secondCrlf);
+    }
 }

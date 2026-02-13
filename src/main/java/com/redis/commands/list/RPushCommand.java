@@ -79,4 +79,9 @@ public class RPushCommand implements ICommand {
     public String name() {
         return "RPUSH";
     }
+
+    @Override
+    public boolean isWriteCommand() {
+        return true;
+    }
 }
